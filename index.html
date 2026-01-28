@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VoxSolfejo AI</title>
+    
+    <!-- Configurações para Celular (PWA) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4F46E5">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .active-note { background: #4F46E5 !important; color: white; transform: scale(1.1); box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4); }
+        .control-btn { transition: all 0.2s active:scale-95; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 select-none">
+
+    <!-- App Container -->
+    <div class="flex flex-col h-screen max-h-screen">
+        
+        <!-- Header -->
+        <header class="bg-white p-4 pt-10 border-b flex justify-between items-center shadow-sm">
+            <div>
+                <h1 class="text-xl font-bold text-indigo-600">VoxSolfejo</h1>
+                <p class="text-[10px] text-slate-400 font-mono">CALIBRADO A4=440Hz</p>
+            </div>
+            <label class="bg-indigo-50 px-4 py-2 rounded-full text-indigo-600 text-sm font-semibold cursor-pointer">
+                📂 Abrir PDF/XML
+                <input type="file" id="fileInput" class="hidden" accept=".pdf,.xml,.musicxml">
+            </label>
+        </header>
+
+        <!-- Área da Partitura / Visualizador -->
+        <div class="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center">
+            <div id="scoreDisplay" class="w-full bg-white rounded-2xl shadow-inner min-h-[250px] flex flex-wrap items-center justify-center gap-3 p-6 border-2 border-dashed border-slate-200 text-slate-400 text-center">
+                As notas aparecerão aqui ao carregar ou iniciar o solfejo exemplo
+            </div>
+        </div>
+
+        <!-- Controles Inferiores (Mobile First) -->
+        <div class="bg-white p-6 rounded-t-3xl shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.1)] border-t border-slate-100">
+            
+            <!-- BPM e Velocidade -->
+            <div class="mb-6">
+                <div class="flex justify-between mb-2">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Andamento</span>
+                    <span id="bpmVal" class="text-indigo-600 font-bold">100 BPM</span>
+                </div>
+                <input type="range" id="bpmRange" min="40" max="220" value="100" class="w-full h-3 bg-slate-100 rounded-lg appearance-none accent-indigo-600">
+            </div>
+
+            <!-- Botões Principais -->
+            <div class="flex justify-around items-center">
+                <button id="stopBtn" class="control-btn p-4 bg-slate-100 rounded-full text-slate-400">
+                    <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4h12v12H4V4z"/></svg>
+                </button>
+                
+                <button id="playBtn" class="control-btn p-6 bg-indigo-600 rounded-full text-white shadow-xl shadow-indigo-200">
+                    <svg id="playIcon" class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20"><path d="M4.5 2.691a.5.5 0 01.766-.425l12.827 8.017a.5.5 0 010 .85l-12.827 8.017a.5.5 0 01-.766-.425V2.691z"/></svg>
+                </button>
+
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] font-bold text-slate-400 mb-1">VOZ</span>
+                    <div class="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold">A4</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO DO MOTOR DE ÁUDIO ---
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let ctx;
+
+        const NOTAS_FREQ = {
+            "Dó": 261.63, "Ré": 293.66, "Mi": 329.63, "Fá": 349.23, 
+            "Sol": 392.00, "Lá": 440.00, "Si": 493.88, "Dó(o)": 523.25
+        };
+
+        const FORMANTES = {
+            "Dó": 450, "Ré": 650, "Mi": 350, "Fá": 750, "Sol": 550, "Lá": 850, "Si": 400
+        };
+
+        let sequencia = [
+            {n: "Dó", d: 1}, {n: "Ré", d: 1}, {n: "Mi", d: 1}, {n: "Fá", d: 1},
+            {n: "Sol", d: 1}, {n: "Lá", d: 1}, {n: "Si", d: 1}, {n: "Dó(o)", d: 2}
+        ];
+
+        let rodando = false;
+
+        function cantar(frequencia, formante, duracao) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const filter = ctx.createBiquadFilter();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(frequencia, ctx.currentTime);
+
+            filter.type = 'bandpass';
+            filter.frequency.value = formante;
+            filter.Q.value = 12;
+
+            gain.gain.setValueAtTime(0, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duracao);
+
+            // Adiciona vibrato leve para parecer voz humana
+            const lfo = ctx.createOscillator();
+            const lfoGain = ctx.createGain();
+            lfo.frequency.value = 5; 
+            lfoGain.gain.value = 3; 
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfo.start();
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start();
+            osc.stop(ctx.currentTime + duracao);
+        }
+
+        async function playSolfejo() {
+            if (rodando) return;
+            rodando = true;
+            if (!ctx) ctx = new AudioCtx();
+            if (ctx.state === 'suspended') await ctx.resume();
+
+            const bpm = document.getElementById('bpmRange').value;
+            const tempoNota = 60 / bpm;
+            const container = document.getElementById('scoreDisplay');
+            container.innerHTML = '';
+
+            for (let item of sequencia) {
+                if (!rodando) break;
+
+                const badge = document.createElement('div');
+                badge.className = "w-14 h-14 border-2 border-slate-100 rounded-full flex items-center justify-center font-bold text-slate-400 transition-all duration-150";
+                badge.innerText = item.n;
+                container.appendChild(badge);
+
+                badge.classList.add('active-note');
+                
+                // Pega a sílaba base para o formante (remove oitava se houver)
+                const nomeNota = item.n.split('(')[0];
+                cantar(NOTAS_FREQ[item.n], FORMANTES[nomeNota], item.d * tempoNota);
+
+                await new Promise(r => setTimeout(r, item.d * tempoNota * 1000));
+                badge.classList.remove('active-note');
+            }
+            rodando = false;
+        }
+
+        // --- INTERAÇÕES ---
+        document.getElementById('playBtn').addEventListener('click', playSolfejo);
+        document.getElementById('stopBtn').addEventListener('click', () => rodando = false);
+        document.getElementById('bpmRange').oninput = (e) => {
+            document.getElementById('bpmVal').innerText = e.target.value + " BPM";
+        };
+
+        // Bloqueia o sono da tela em 2026 usando WakeLock API
+        if ('wakeLock' in navigator) {
+            navigator.wakeLock.request('screen');
+        }
+    </script>
+</body>
+</html>
