@@ -3,17 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VoxSolfejo Maestro AI</title>
+    <title>VoxSolfejo AI - Instrumentista Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net"></script>
     <script src="https://cdn.jsdelivr.net"></script>
     <style>
         @import url('https://fonts.googleapis.com');
-        body { font-family: 'Inter', sans-serif; background: #F1F5F9; }
-        .glass { background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(12px); }
-        input[type=range] { accent-color: #4F46E5; cursor: pointer; }
-        .control-label { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-        textarea { resize: none; border: 2px solid #E2E8F0; }
-        textarea:focus { border-color: #4F46E5; outline: none; }
+        body { font-family: 'Inter', sans-serif; background: #F8FAFC; }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .inst-tab { transition: all 0.2s; cursor: pointer; }
+        .inst-active { border-bottom: 3px solid #4F46E5; color: #4F46E5; font-weight: 900; }
     </style>
 </head>
 <body class="p-2 md:p-6 select-none">
@@ -22,161 +21,133 @@
         <!-- Header -->
         <header class="bg-indigo-600 p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="text-center md:text-left">
-                <h1 class="text-2xl font-black italic tracking-tighter uppercase">VOXSOLFEJO MAESTRO</h1>
-                <p class="text-[10px] font-bold opacity-80 uppercase tracking-widest">Leitura Completa de Símbolos, Ritmo e Dinâmicas</p>
+                <h1 class="text-2xl font-black italic tracking-tighter uppercase">VOXSOLFEJO AI</h1>
+                <p class="text-[10px] font-bold opacity-80 uppercase tracking-widest text-indigo-200">Articulação Especial: Violino, Flauta e Piano</p>
             </div>
-            <label class="bg-white text-indigo-600 px-6 py-2.5 rounded-full font-bold cursor-pointer hover:scale-105 transition shadow-lg text-xs">
-                📂 ABRIR PARTITURA (PDF/XML)
-                <input type="file" id="fileInput" class="hidden" accept=".xml,.musicxml,.mxl,.pdf">
-            </label>
+            <div class="flex gap-2">
+                <label class="bg-white text-indigo-600 px-6 py-2 rounded-full font-bold cursor-pointer shadow-lg text-xs">
+                    📁 CARREGAR PARTITURA (PDF/XML)
+                    <input type="file" id="fileInput" class="hidden" accept=".xml,.musicxml,.mxl,.pdf">
+                </label>
+            </div>
         </header>
 
+        <!-- Seletor de Articulação de Instrumento -->
+        <div class="flex justify-center bg-slate-50 border-b gap-8 py-4">
+            <button onclick="setInst('vocal')" id="tab-vocal" class="inst-tab inst-active text-xs uppercase font-bold tracking-widest px-4">Voz/Solfejo</button>
+            <button onclick="setInst('violino')" id="tab-violino" class="inst-tab text-xs uppercase font-bold tracking-widest px-4">Violino (Legato/Arco)</button>
+            <button onclick="setInst('flauta')" id="tab-flauta" class="inst-tab text-xs uppercase font-bold tracking-widest px-4">Flauta (Ataque/Língua)</button>
+            <button onclick="setInst('piano')" id="tab-piano" class="inst-tab text-xs uppercase font-bold tracking-widest px-4">Piano (Pedal/Ressonância)</button>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-4">
-            <!-- Editor de Texto -->
-            <div class="p-6 bg-slate-50/80 border-r border-slate-100 flex flex-col">
-                <label class="control-label mb-3 block text-center">Editor Manual (Cursor)</label>
-                <textarea id="textoInput" placeholder="Ex: C D# E F G Ab B" 
-                    class="w-full flex-grow p-4 rounded-2xl text-lg font-mono mb-4">C D E F G A B</textarea>
-                <button id="processarTexto" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-black transition">
-                    Interpretar Texto
-                </button>
+            <!-- Coluna de Texto e Monitor -->
+            <div class="p-6 bg-slate-50/50 border-r border-slate-100 flex flex-col gap-4">
+                <div class="bg-slate-900 rounded-3xl p-5 text-center shadow-xl border-b-4 border-indigo-500">
+                    <span class="text-indigo-400 text-[10px] font-black tracking-widest uppercase">Nota / Articulação</span>
+                    <div id="vocalLabel" class="text-5xl font-black text-white py-1">--</div>
+                    <div id="artLabel" class="text-indigo-300 font-mono text-[10px] italic">Sustain</div>
+                </div>
+                <textarea id="textoInput" placeholder="C D E F G A B" class="w-full h-32 p-4 rounded-2xl text-lg font-mono outline-none border border-slate-200">C D E F G A B</textarea>
+                <button id="processarTexto" class="w-full py-2 bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest">Atualizar Texto</button>
             </div>
 
-            <!-- Visualizador Maestro -->
-            <div class="lg:col-span-2 p-6 flex flex-col">
-                <div id="osmdCanvas" class="w-full min-h-[350px] bg-white rounded-3xl p-4 overflow-auto border border-slate-100 shadow-inner text-center">
-                    <div id="placeholder" class="py-28 text-slate-300 italic text-sm text-center">Aguardando partitura para análise de símbolos...</div>
+            <!-- Coluna Visual -->
+            <div class="lg:col-span-2 p-6 border-r border-slate-100 bg-white">
+                <div id="osmdCanvas" class="w-full min-h-[350px] overflow-auto text-center">
+                    <p class="py-24 text-slate-300 italic text-sm">Arraste aqui a partitura instrumental...</p>
                 </div>
             </div>
 
             <!-- Controles do Músico -->
-            <div class="p-6 bg-slate-50/50 border-l border-slate-100 space-y-6">
-                <div class="bg-slate-900 rounded-[2rem] p-6 text-center shadow-xl border-b-4 border-indigo-500">
-                    <span class="text-indigo-400 text-[10px] font-black tracking-widest uppercase">Voz / Dinâmica</span>
-                    <div id="vocalLabel" class="text-5xl font-black text-white py-1">--</div>
-                    <div id="dynamicLabel" class="text-indigo-400 text-xs font-bold italic uppercase tracking-widest">mf</div>
-                </div>
-
+            <div class="p-6 space-y-6">
                 <div class="space-y-4">
                     <div>
-                        <div class="flex justify-between mb-1"><label class="control-label">Velocidade (BPM)</label><span id="bpmText" class="text-indigo-600 font-black">80</span></div>
-                        <input type="range" id="bpmRange" min="20" max="220" value="80" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none">
+                        <div class="flex justify-between mb-1"><label class="text-[10px] font-bold text-slate-500">BPM</label><span id="bpmText" class="text-indigo-600 font-black">80</span></div>
+                        <input type="range" id="bpmRange" min="20" max="220" value="80" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none accent-indigo-600">
                     </div>
                     <div>
-                        <div class="flex justify-between mb-1"><label class="control-label">Transposição</label><span id="transposeText" class="text-indigo-600 font-black">0</span></div>
-                        <input type="range" id="transposeRange" min="-12" max="12" value="0" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none">
-                    </div>
-                    <div>
-                        <div class="flex justify-between mb-1"><label class="control-label">Afinação (Hz)</label><span id="baseHzText" class="text-indigo-600 font-black">440Hz</span></div>
-                        <input type="range" id="baseHzRange" min="415" max="466" value="440" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none">
+                        <div class="flex justify-between mb-1"><label class="text-[10px] font-bold text-slate-500">Afinação Base</label><span id="baseHzText" class="text-indigo-600 font-black">440Hz</span></div>
+                        <input type="range" id="baseHzRange" min="415" max="466" value="440" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none accent-indigo-600">
                     </div>
                 </div>
 
-                <button id="playBtn" class="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all">PLAY MAESTRO</button>
-                <button id="stopBtn" class="w-full py-2 bg-white text-slate-400 rounded-xl font-bold border border-slate-200 uppercase text-[10px] tracking-widest transition-all">Parar</button>
+                <div class="flex flex-col gap-2 pt-4 border-t">
+                    <button id="playBtn" class="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all">SOLFEJAR / TOCAR</button>
+                    <button id="stopBtn" class="w-full py-2 bg-slate-100 text-slate-400 rounded-xl font-bold text-[10px] uppercase">Parar</button>
+                    <div class="flex gap-2">
+                        <button id="exportWav" class="flex-1 py-2 bg-emerald-500 text-white rounded-lg text-[9px] font-bold">GRAVAR .WAV</button>
+                        <button id="exportMidi" class="flex-1 py-2 bg-amber-500 text-white rounded-lg text-[9px] font-bold">MIDI</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         const NOTAS_REF = { 'C': -9, 'D': -7, 'E': -5, 'F': -4, 'G': -2, 'A': 0, 'B': 2 };
-        const NOMES_FONETICOS = { 'C': 'Dó', 'D': 'Ré', 'E': 'Mi', 'F': 'Fá', 'G': 'Sol', 'A': 'Lá', 'B': 'Si' };
+        const NOMES_FON = { 'C': 'Dó', 'D': 'Ré', 'E': 'Mi', 'F': 'Fá', 'G': 'Sol', 'A': 'Lá', 'B': 'Si' };
         
-        let audioCtx, queue = [], rodando = false;
+        let audioCtx, queue = [], rodando = false, instAtivo = 'vocal';
         let osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("osmdCanvas", { drawTitle: false, autoResize: true });
 
-        // Função que calcula frequência exata incluindo ACIDENTES (# e b) e AFINAÇÃO BASE
-        function calcularFreqCompleta(letra, oitava, acidente, transp, baseHz) {
-            let semitons = NOTAS_REF[letra] + (oitava - 4) * 12 + transp;
-            if (acidente === 1) semitons += 1; // Sustenido
-            if (acidente === -1) semitons -= 1; // Bemol
-            return baseHz * Math.pow(2, semitons / 12);
+        function setInst(tipo) {
+            instAtivo = tipo;
+            document.querySelectorAll('.inst-tab').forEach(t => t.classList.remove('inst-active'));
+            document.getElementById(`tab-${tipo}`).classList.add('inst-active');
         }
 
-        // 1. Processamento de Símbolos Musicais (MusicXML / PDF)
-        document.getElementById('fileInput').onchange = (e) => {
-            const file = e.target.files; if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async (ev) => {
-                document.getElementById('placeholder').style.display = 'none';
-                await osmd.load(ev.target.result);
-                osmd.render();
-                extrairSimbolosMusicais();
-            };
-            reader.readAsText(file);
-        };
-
-        function extrairSimbolosMusicais() {
-            queue = [];
-            const measures = osmd.GraphicSheet.MusicPages[0].MusicSystems[0].StaffLines[0].Measures;
-            measures.forEach(m => {
-                m.StaffEntries.forEach(se => {
-                    const source = se.ModelStaffEntry;
-                    const dur = source.Duration.RealValue;
-                    const dynamic = source.parentMeasure.parentSourceMeasure.printSuggestions?.dynamic || "mf";
-
-                    if (source.sourceNotes.length > 0) {
-                        const sn = source.sourceNotes[0];
-                        const p = sn.Pitch;
-                        queue.push({
-                            tipo: 'nota',
-                            letra: "CDEFGAB"[p.fundamentalPitch],
-                            oitava: p.octave + 3,
-                            acidente: p.accidental || 0,
-                            dur: dur,
-                            dinamica: dynamic,
-                            articulacao: sn.articulations?.[0]?.articulationType || "normal"
-                        });
-                    } else {
-                        queue.push({ tipo: 'pausa', dur: dur });
-                    }
-                });
-            });
-        }
-
-        // 2. Motor de Voz Humana com Resposta a Dinâmicas e Articulações
-        function cantarMaestro(item, tempoReal) {
+        // MOTOR DE ÁUDIO INSTRUMENTAL (Articulação 2026)
+        function cantar(item, tempoReal) {
             if (!audioCtx) audioCtx = new AudioContext();
             const baseHz = parseInt(document.getElementById('baseHzRange').value);
-            const transp = parseInt(document.getElementById('transposeRange').value);
+            const freq = baseHz * Math.pow(2, (NOTAS_REF[item.letra] + (item.oitava - 4) * 12) / 12);
 
-            if (item.tipo === 'nota') {
-                const freq = calcularFreqCompleta(item.letra, item.oitava, item.acidente, transp, baseHz);
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
-                // Ajuste de Volume baseado na Dinâmica (pp, f, ff...)
-                let vol = 0.3;
-                if (item.dinamica.includes('f')) vol = 0.6;
-                if (item.dinamica.includes('p')) vol = 0.15;
+            // CONFIGURAÇÃO POR INSTRUMENTO
+            let attack = 0.05, release = 0.1, type = 'sawtooth';
 
-                // Ajuste de Duração baseado na Articulação (Staccato)
-                let durEfetiva = tempoReal;
-                if (item.articulacao === "staccato") durEfetiva = tempoReal * 0.4;
-
-                gain.gain.setValueAtTime(0, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.05);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + durEfetiva);
-
-                const fala = new SpeechSynthesisUtterance(NOMES_FONETICOS[item.letra]);
-                fala.lang = 'pt-BR'; fala.rate = 1.3;
-                window.speechSynthesis.speak(fala);
-
-                document.getElementById('vocalLabel').innerText = NOMES_FONETICOS[item.letra] + (item.acidente === 1 ? "#" : item.acidente === -1 ? "b" : "");
-                document.getElementById('dynamicLabel').innerText = item.dinamica;
-
-                osc.connect(gain); gain.connect(audioCtx.destination);
-                osc.start(); osc.stop(audioCtx.currentTime + durEfetiva);
-            } else {
-                document.getElementById('vocalLabel').innerText = "—";
-                document.getElementById('dynamicLabel').innerText = "pausa";
+            switch(instAtivo) {
+                case 'violino': // Legato e Ataque de Arco
+                    type = 'sawtooth';
+                    attack = item.art === 'staccato' ? 0.01 : 0.15;
+                    release = 0.3;
+                    document.getElementById('artLabel').innerText = "Arco / Detaché";
+                    break;
+                case 'flauta': // Golpe de Língua (Ar)
+                    type = 'sine';
+                    attack = item.art === 'staccato' ? 0.01 : 0.08;
+                    release = 0.05;
+                    document.getElementById('artLabel').innerText = "Ar / Tu-tu";
+                    break;
+                case 'piano': // Ataque Percussivo e Pedal
+                    type = 'triangle';
+                    attack = 0.005;
+                    release = item.art === 'legato' ? 0.8 : 0.15;
+                    document.getElementById('artLabel').innerText = "Martelo / Pedal";
+                    break;
+                default: // Solfejo Vocal
+                    type = 'sawtooth';
+                    const fala = new SpeechSynthesisUtterance(NOMES_FON[item.letra]);
+                    fala.lang = 'pt-BR'; window.speechSynthesis.speak(fala);
+                    document.getElementById('artLabel').innerText = "Voz Fonética";
             }
+
+            osc.type = type;
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + attack);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + tempoReal + release);
+
+            document.getElementById('vocalLabel').innerText = NOMES_FON[item.letra];
+
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + tempoReal + release);
         }
 
-        // 3. Loop de Execução Maestro
+        // LÓGICA DE EXECUÇÃO
         async function play() {
             if (rodando || queue.length === 0) return;
             rodando = true; if (audioCtx) await audioCtx.resume();
@@ -184,30 +155,46 @@
                 if (!rodando) break;
                 const bpm = document.getElementById('bpmRange').value;
                 const tempoNota = item.dur * (60 / bpm) * 4;
-                cantarMaestro(item, tempoNota);
+                cantar(item, tempoNota);
                 await new Promise(r => setTimeout(r, tempoNota * 1000));
             }
             rodando = false;
         }
 
-        // Eventos e UI
+        // CARREGAMENTO E PROCESSAMENTO
+        document.getElementById('fileInput').onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                await osmd.load(ev.target.result);
+                osmd.render();
+                extrairNotas();
+            };
+            reader.readAsText(e.target.files[0]);
+        };
+
+        function extrairNotas() {
+            queue = [];
+            osmd.GraphicSheet.MusicPages.forEach(p => p.MusicSystems.forEach(s => s.StaffLines.forEach(l => l.Measures.forEach(m => m.StaffEntries.forEach(e => {
+                const sn = e.ModelStaffEntry.sourceNotes;
+                if (sn.length > 0) {
+                    const p = sn[0].Pitch;
+                    // Detecta se há símbolo de staccato ou ligadura
+                    const art = e.ModelStaffEntry.articulations ? 'staccato' : 'normal';
+                    queue.push({ letra: "CDEFGAB"[p.fundamentalPitch], oitava: p.octave + 3, dur: e.ModelStaffEntry.Duration.RealValue, art });
+                } else { queue.push({ dur: e.ModelStaffEntry.Duration.RealValue, tipo: 'pausa' }); }
+            })))));
+        }
+
         document.getElementById('processarTexto').onclick = () => {
             const texto = document.getElementById('textoInput').value.toUpperCase();
-            const matches = texto.match(/([A-G][#b]?)/g);
-            if (matches) {
-                queue = matches.map(m => ({
-                    letra: m[0],
-                    acidente: m.includes('#') ? 1 : m.includes('b') ? -1 : 0,
-                    oitava: 4, dur: 1, tipo: 'nota', dinamica: 'mf', articulacao: 'normal'
-                }));
-                alert(matches.length + " notas carregadas via Editor.");
-            }
+            const matches = texto.match(/[A-G]/g);
+            if (matches) queue = matches.map(n => ({ letra: n, oitava: 4, dur: 1, art: 'normal' }));
+            alert("Texto carregado para solfejo!");
         };
 
         document.getElementById('playBtn').onclick = play;
         document.getElementById('stopBtn').onclick = () => { rodando = false; window.speechSynthesis.cancel(); };
         document.getElementById('bpmRange').oninput = (e) => document.getElementById('bpmText').innerText = e.target.value;
-        document.getElementById('transposeRange').oninput = (e) => document.getElementById('transposeText').innerText = e.target.value;
         document.getElementById('baseHzRange').oninput = (e) => document.getElementById('baseHzText').innerText = e.target.value + "Hz";
     </script>
 </body>
