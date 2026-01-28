@@ -1,137 +1,151 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VoxSolfejo</title>
+<title>VoxSolfejo Maestro</title>
 
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.0/build/opensheetmusicdisplay.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/opensheetmusicdisplay@1.8.5/build/opensheetmusicdisplay.min.js"></script>
 
 <style>
 body { background:#0f172a; color:white; }
-button:disabled { opacity:.4; cursor:not-allowed; }
+button:disabled { opacity:.4; }
 </style>
 </head>
 
-<body class="p-4 max-w-4xl mx-auto space-y-4">
+<body class="p-4">
 
-<h1 class="text-2xl font-black text-center">🎶 VoxSolfejo</h1>
+<div class="max-w-5xl mx-auto bg-slate-800 rounded-2xl p-4 space-y-4">
 
-<input type="file" id="fileInput" accept=".xml,.musicxml,.mxl"
-  class="block w-full text-sm mb-2">
+<header class="flex justify-between items-center">
+  <h1 class="text-xl font-bold">🎼 VoxSolfejo Maestro</h1>
 
-<div class="flex gap-3">
-  <button id="testSound" class="bg-green-600 px-4 py-2 rounded font-bold">
-    🔊 TESTAR SOM
+  <label class="bg-indigo-600 px-4 py-2 rounded cursor-pointer">
+    Upload MusicXML
+    <input type="file" id="fileInput" class="hidden" accept=".xml,.musicxml,.mxl">
+  </label>
+</header>
+
+<div id="osmdCanvas" class="bg-white rounded-xl p-2 min-h-[300px] text-black">
+  <p class="text-center text-gray-400 mt-24">Carregue uma partitura MusicXML</p>
+</div>
+
+<div class="flex gap-4 items-center">
+  <button id="playBtn" disabled
+    class="flex-1 bg-green-600 py-3 rounded-xl font-bold text-lg">
+    ▶ PLAY
   </button>
 
-  <button id="playBtn" disabled
-    class="bg-indigo-600 px-4 py-2 rounded font-bold">
-    ▶ PLAY
+  <button id="stopBtn"
+    class="bg-red-600 px-6 py-3 rounded-xl font-bold">
+    ■
   </button>
 </div>
 
-<label class="text-sm">
-  BPM
-  <input type="range" id="bpm" min="40" max="200" value="80">
-  <span id="bpmVal">80</span>
-</label>
+<div class="flex gap-4 text-sm">
+  <div>
+    BPM:
+    <input id="bpm" type="number" value="80" class="text-black w-16 ml-1">
+  </div>
+  <div>
+    Afinação:
+    <input id="hz" type="number" value="440" class="text-black w-20 ml-1">
+  </div>
+</div>
 
-<div id="score" class="bg-white text-black rounded-xl p-3"></div>
+</div>
 
 <script>
-let audioCtx = null;
+let osmd;
 let queue = [];
+let audioCtx;
+let playing = false;
 
-const SOLFEJO = ['Dó','Ré','Mi','Fá','Sol','Lá','Si'];
-const REF = [-9,-7,-5,-4,-2,0,2];
+const NOTE_INDEX = { C:-9, D:-7, E:-5, F:-4, G:-2, A:0, B:2 };
 
-const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
-  autoResize: true,
-  drawTitle: false
-});
+function freqFromNote(letter, octave, hz) {
+  const semitones = NOTE_INDEX[letter] + (octave - 4) * 12;
+  return hz * Math.pow(2, semitones / 12);
+}
 
-/* ===== TEST SOUND ===== */
-document.getElementById("testSound").onclick = async () => {
-  if (!audioCtx) audioCtx = new AudioContext();
-  await audioCtx.resume();
-  const o = audioCtx.createOscillator();
-  o.frequency.value = 440;
-  o.connect(audioCtx.destination);
-  o.start();
-  o.stop(audioCtx.currentTime + .3);
-};
-
-/* ===== LOAD FILE ===== */
 document.getElementById("fileInput").onchange = async e => {
   const file = e.target.files[0];
   if (!file) return;
 
-  await osmd.load(await file.arrayBuffer());
+  if (!osmd) {
+    osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("osmdCanvas");
+  }
+
+  await osmd.load(URL.createObjectURL(file));
   osmd.render();
 
-  extrairNotasCorretamente();
-
-  console.log("Notas extraídas:", queue.length);
-
-  document.getElementById("playBtn").disabled = queue.length === 0;
-};
-
-/* ===== EXTRAÇÃO CORRETA (API REAL) ===== */
-function extrairNotasCorretamente() {
   queue = [];
 
-  osmd.GraphicSheet.MeasureList.forEach(medidas => {
-    medidas.forEach(m => {
-      m.staffEntries.forEach(se => {
-        se.graphicalVoiceEntries.forEach(gve => {
-          gve.notes.forEach(gn => {
-            const p = gn.sourceNote?.Pitch;
-            if (!p) return;
+  const measures =
+    osmd.GraphicSheet.MusicPages[0]
+      .MusicSystems[0]
+      .StaffLines[0]
+      .Measures;
 
-            queue.push({
-              letra: p.FundamentalNote,
-              oitava: p.Octave,
-              acidente: p.Accidental || 0,
-              dur: gn.sourceNote.Length.RealValue
-            });
-          });
+  measures.forEach(m =>
+    m.StaffEntries.forEach(se => {
+      const model = se.ModelStaffEntry;
+      const dur = model.Duration.RealValue;
+
+      if (model.Notes.length > 0) {
+        const n = model.Notes[0].Pitch;
+        queue.push({
+          letter: "CDEFGAB"[n.FundamentalNote],
+          octave: n.Octave + 3,
+          dur
         });
-      });
-    });
-  });
-}
+      } else {
+        queue.push({ rest:true, dur });
+      }
+    })
+  );
 
-/* ===== PLAY ===== */
-document.getElementById("playBtn").onclick = async () => {
+  document.getElementById("playBtn").disabled = false;
+};
+
+async function play() {
+  if (playing || queue.length === 0) return;
+  playing = true;
+
   if (!audioCtx) audioCtx = new AudioContext();
   await audioCtx.resume();
 
   const bpm = +document.getElementById("bpm").value;
+  const hz = +document.getElementById("hz").value;
 
   for (const n of queue) {
-    const t = n.dur * (60 / bpm) * 4;
+    if (!playing) break;
 
-    const o = audioCtx.createOscillator();
-    o.type = "triangle";
-    o.frequency.value =
-      440 * Math.pow(2, (REF[n.letra] + (n.oitava - 4) * 12 + n.acidente) / 12);
+    const durSec = n.dur * (60 / bpm) * 4;
 
-    o.connect(audioCtx.destination);
-    o.start();
-    o.stop(audioCtx.currentTime + t);
+    if (!n.rest) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
 
-    speechSynthesis.speak(
-      new SpeechSynthesisUtterance(SOLFEJO[n.letra])
-    );
+      osc.frequency.value = freqFromNote(n.letter, n.octave, hz);
+      gain.gain.value = 0.25;
 
-    await new Promise(r => setTimeout(r, t * 1000));
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + durSec);
+    }
+
+    await new Promise(r => setTimeout(r, durSec * 1000));
   }
-};
 
-document.getElementById("bpm").oninput =
-  e => bpmVal.innerText = e.target.value;
+  playing = false;
+}
+
+document.getElementById("playBtn").onclick = play;
+document.getElementById("stopBtn").onclick = () => playing = false;
 </script>
 
 </body>
