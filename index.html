@@ -10,7 +10,7 @@
 
 <style>
 body { background:#0f172a; color:white; }
-button { touch-action: manipulation; }
+button:disabled { opacity:.4; }
 </style>
 </head>
 
@@ -26,75 +26,65 @@ button { touch-action: manipulation; }
     🔊 TESTAR SOM
   </button>
 
-  <button id="playBtn" class="bg-indigo-600 px-4 py-2 rounded font-bold">
+  <button id="playBtn" disabled
+    class="bg-indigo-600 px-4 py-2 rounded font-bold">
     ▶ PLAY
   </button>
 </div>
 
-<div class="flex gap-4 text-sm">
-  <label>BPM
-    <input type="range" id="bpm" min="40" max="200" value="80">
-    <span id="bpmVal">80</span>
-  </label>
-</div>
+<label class="text-sm">
+  BPM
+  <input type="range" id="bpm" min="40" max="200" value="80">
+  <span id="bpmVal">80</span>
+</label>
 
 <div id="score" class="bg-white text-black rounded-xl p-3"></div>
 
 <script>
-/* ================= AUDIO ================= */
 let audioCtx = null;
-
-/* ================= TEST SOUND ================= */
-document.getElementById("testSound").onclick = async () => {
-  if (!audioCtx) audioCtx = new AudioContext();
-  await audioCtx.resume();
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.frequency.value = 440;
-  gain.gain.value = 0.4;
-
-  osc.connect(gain).connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime + 0.4);
-};
-
-/* ================= OSMD ================= */
-const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
-  autoResize: true,
-  drawTitle: false
-});
-
 let queue = [];
 
 const SOLFEJO = ['Dó','Ré','Mi','Fá','Sol','Lá','Si'];
 const REF = [-9,-7,-5,-4,-2,0,2];
 
-/* ================= LOAD XML ================= */
+const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
+  autoResize: true,
+  drawTitle: false
+});
+
+/* ================= TEST SOUND ================= */
+document.getElementById("testSound").onclick = async () => {
+  if (!audioCtx) audioCtx = new AudioContext();
+  await audioCtx.resume();
+  const o = audioCtx.createOscillator();
+  o.frequency.value = 440;
+  o.connect(audioCtx.destination);
+  o.start();
+  o.stop(audioCtx.currentTime + .3);
+};
+
+/* ================= LOAD FILE ================= */
 document.getElementById("fileInput").onchange = async e => {
   const file = e.target.files[0];
   if (!file) return;
 
   await osmd.load(await file.text());
   osmd.render();
-  extrairNotasCorretamente();
+  extrairNotas();
+
+  document.getElementById("playBtn").disabled = queue.length === 0;
 };
 
-/* ================= EXTRAÇÃO CORRETA ================= */
-function extrairNotasCorretamente() {
+/* ================= EXTRACT ================= */
+function extrairNotas() {
   queue = [];
 
-  const measures = osmd.Sheet.SourceMeasures;
-
-  measures.forEach(measure => {
-    measure.VerticalSourceStaffEntryContainers.forEach(v => {
+  osmd.Sheet.SourceMeasures.forEach(m => {
+    m.VerticalSourceStaffEntryContainers.forEach(v => {
       v.SourceStaffEntry?.VoiceEntries.forEach(ve => {
         const dur = ve.Duration?.RealValue || 0;
-
         ve.Notes.forEach(n => {
           if (!n.Pitch) return;
-
           queue.push({
             letra: n.Pitch.FundamentalNote,
             oitava: n.Pitch.Octave,
@@ -106,34 +96,39 @@ function extrairNotasCorretamente() {
     });
   });
 
-  console.log("Notas extraídas:", queue.length);
-}
-
-/* ================= FREQUÊNCIA ================= */
-function freq(n) {
-  return 440 * Math.pow(
-    2,
-    (REF[n.letra] + (n.oitava - 4) * 12 + n.acidente) / 12
-  );
+  console.log("Notas prontas:", queue.length);
 }
 
 /* ================= PLAY ================= */
 document.getElementById("playBtn").onclick = async () => {
-  if (!queue.length) {
-    alert("Partitura carregada, mas sem notas executáveis.");
-    return;
-  }
-
   if (!audioCtx) audioCtx = new AudioContext();
   await audioCtx.resume();
 
   const bpm = +document.getElementById("bpm").value;
 
   for (const n of queue) {
-    const tempo = n.dur * (60 / bpm) * 4;
+    const t = n.dur * (60 / bpm) * 4;
 
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+    const o = audioCtx.createOscillator();
+    o.type = "triangle";
+    o.frequency.value =
+      440 * Math.pow(2, (REF[n.letra] + (n.oitava - 4) * 12 + n.acidente) / 12);
 
-    osc.type = "triangle";
-    osc.frequ
+    o.connect(audioCtx.destination);
+    o.start();
+    o.stop(audioCtx.currentTime + t);
+
+    speechSynthesis.speak(
+      new SpeechSynthesisUtterance(SOLFEJO[n.letra])
+    );
+
+    await new Promise(r => setTimeout(r, t * 1000));
+  }
+};
+
+document.getElementById("bpm").oninput =
+  e => bpmVal.innerText = e.target.value;
+</script>
+
+</body>
+</html>
