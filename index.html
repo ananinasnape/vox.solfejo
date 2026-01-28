@@ -3,175 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VoxSolfejo Maestro AI</title>
+    <title>VoxSolfejo Maestro AI - Sincronia Total</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net"></script>
+    <script src="https://cdnjs.cloudflare.com"></script>
+
     <style>
-        body { background-color: #0F172A; color: #F1F5F9; font-family: sans-serif; }
-        .glass { background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.1); }
-        #canvas-container { background: white; border-radius: 1rem; min-height: 500px; display: flex; align-items: center; justify-content: center; }
-        canvas { max-width: 100%; border-radius: 1rem; }
-        .note-btn { background: #1E293B; border: 1px solid #334155; transition: 0.1s; }
-        .note-btn:active { background: #4F46E5; transform: scale(0.95); }
+        @import url('https://fonts.googleapis.com');
+        body { font-family: 'Inter', sans-serif; background: #0F172A; color: #F1F5F9; margin: 0; }
+        .glass { background: rgba(30, 41, 59, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        #osmdCanvas { background: white !important; border-radius: 1.5rem; min-height: 500px; width: 100%; color: black; position: relative; }
+        #pdfCanvas { display: none; margin: 0 auto; max-width: 100%; border-radius: 1.5rem; }
+        textarea { background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; color: #818CF8; outline: none; }
+        .btn-play { background: #4F46E5; transition: 0.2s; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4); }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="p-2 md:p-6">
 
-    <div class="max-w-6xl mx-auto space-y-6">
-        <!-- HEADER -->
-        <header class="glass rounded-3xl p-6 flex justify-between items-center shadow-2xl">
+    <div class="max-w-6xl mx-auto space-y-4">
+        <!-- Header -->
+        <header class="glass rounded-3xl p-6 flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
             <div>
-                <h1 class="text-2xl font-black text-indigo-400 italic uppercase">VoxSolfejo Maestro</h1>
-                <p class="text-[10px] font-bold opacity-60">SISTEMA INTEGRADO 440Hz • 2026</p>
+                <h1 class="text-2xl font-black text-indigo-400 tracking-tighter uppercase">VOXSOLFEJO MAESTRO</h1>
+                <p class="text-[10px] font-bold opacity-60 uppercase tracking-widest">Sincronia Voz/Nota • A4=440Hz • PDF/XML</p>
             </div>
-            <label class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold cursor-pointer text-xs">
-                📂 ABRIR PDF
-                <input type="file" id="fileInput" class="hidden" accept=".pdf">
+            <label class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-full font-bold cursor-pointer text-xs transition-all">
+                📂 CARREGAR PARTITURA
+                <input type="file" id="fileInput" class="hidden" accept=".pdf,.xml,.musicxml,.mxl">
             </label>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <!-- PARTITURA -->
-            <div class="lg:col-span-8">
-                <div id="canvas-container" class="shadow-2xl">
-                    <canvas id="pdfCanvas"></canvas>
-                    <p id="msg" class="text-slate-400 italic">Carregue um PDF para visualizar a partitura.</p>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- Visualizador Central -->
+            <div class="lg:col-span-8 order-1">
+                <div class="glass rounded-[2rem] p-4 shadow-2xl">
+                    <div id="osmdCanvas" class="overflow-auto">
+                        <canvas id="pdfCanvas"></canvas>
+                        <div id="placeholderMsg" class="py-40 text-center text-slate-400 italic">O visual da partitura (PDF ou XML) aparecerá aqui.</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- CONTROLES -->
-            <div class="lg:col-span-4 space-y-4">
-                <!-- MONITOR -->
+            <!-- Controles Laterais -->
+            <div class="lg:col-span-4 space-y-4 order-2">
+                <!-- Monitor Vocal -->
                 <div class="glass rounded-3xl p-6 text-center border-t-4 border-indigo-500">
-                    <div id="vocalLabel" class="text-7xl font-black text-white">--</div>
-                    <div id="hzLabel" class="text-indigo-400 font-mono text-xs mt-2 italic tracking-widest text-xs">A4 = 440.00 Hz</div>
+                    <span class="text-[10px] font-bold opacity-40 uppercase block mb-1">Nota Atual</span>
+                    <div id="vocalLabel" class="text-6xl font-black text-white leading-none tracking-tighter">--</div>
+                    <div id="hzLabel" class="text-indigo-400 font-mono text-xs mt-2 italic">Ref: 440.00 Hz</div>
                 </div>
 
-                <!-- EDITOR E ACIDENTES -->
-                <div class="glass rounded-3xl p-5 space-y-3">
-                    <div class="flex gap-1">
-                        <button onclick="insert('♯')" class="flex-1 bg-slate-800 py-2 rounded font-bold text-indigo-400 border border-slate-700">♯</button>
-                        <button onclick="insert('♭')" class="flex-1 bg-slate-800 py-2 rounded font-bold text-indigo-400 border border-slate-700">♭</button>
-                        <button onclick="insert('♮')" class="flex-1 bg-slate-800 py-2 rounded font-bold text-indigo-400 border border-slate-700">♮</button>
+                <!-- Editor de Texto -->
+                <div class="glass rounded-3xl p-4 space-y-3">
+                    <div class="flex justify-between gap-1">
+                        <button onclick="insert('♯')" class="flex-1 bg-slate-800 py-2 rounded text-sm font-bold border border-slate-700 hover:bg-indigo-600">♯</button>
+                        <button onclick="insert('♭')" class="flex-1 bg-slate-800 py-2 rounded text-sm font-bold border border-slate-700 hover:bg-indigo-600">♭</button>
                     </div>
-                    <textarea id="textoInput" class="w-full h-24 p-3 rounded-xl bg-slate-900 border border-slate-700 text-indigo-300 outline-none" placeholder="C D E...">C D E F G A B</textarea>
-                    <button onclick="processarTexto()" class="w-full py-2 bg-indigo-500/20 text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-widest">Processar Notas</button>
+                    <textarea id="textoInput" class="w-full h-24 p-3 rounded-xl text-sm" placeholder="Ex: C D# Eb...">C D E F G A B</textarea>
+                    <button id="processText" class="w-full py-2 bg-indigo-500/20 text-indigo-300 rounded-lg text-[9px] font-bold uppercase tracking-widest">Interpretar Texto</button>
                 </div>
 
-                <!-- SLIDERS -->
+                <!-- Painel Maestro -->
                 <div class="glass rounded-3xl p-5 space-y-4">
-                    <div class="flex justify-between text-[10px] font-bold"><span>BPM: <span id="bpmText">80</span></span></div>
-                    <input type="range" id="bpmRange" min="20" max="220" value="80" class="w-full h-1.5 accent-indigo-500 appearance-none bg-slate-700 rounded-lg">
+                    <div class="flex justify-between items-center text-[10px] font-bold tracking-widest">
+                        <span>BPM: <span id="bpmText" class="text-indigo-400">80</span></span>
+                        <span>TOM: <span id="transpText" class="text-indigo-400">0</span></span>
+                    </div>
+                    <input type="range" id="bpmRange" min="20" max="220" value="80" class="w-full h-1.5 rounded-lg appearance-none bg-slate-700 accent-indigo-500">
+                    <input type="range" id="transpRange" min="-12" max="12" value="0" class="w-full h-1.5 rounded-lg appearance-none bg-slate-700 accent-indigo-500">
                     
-                    <div class="flex justify-between text-[10px] font-bold"><span>CALIBRAÇÃO: <span id="calibText">440Hz</span></span></div>
-                    <input type="range" id="calibRange" min="415" max="466" value="440" class="w-full h-1.5 accent-indigo-500 appearance-none bg-slate-700 rounded-lg">
+                    <div class="flex justify-between items-center text-[10px] font-bold tracking-widest">
+                        <span>CALIBRAÇÃO: <span id="calibText" class="text-indigo-400">440Hz</span></span>
+                    </div>
+                    <input type="range" id="calibRange" min="415" max="466" value="440" class="w-full h-1.5 rounded-lg appearance-none bg-slate-700 accent-indigo-500">
                 </div>
 
-                <button onclick="iniciarSolfejo()" class="w-full py-6 bg-indigo-600 text-white rounded-[2rem] font-black text-3xl shadow-xl hover:bg-indigo-500 transition-all italic">PLAY</button>
-                <button onclick="parar()" class="w-full py-2 text-slate-500 font-bold uppercase text-[9px] tracking-widest">Parar</button>
+                <button id="playBtn" class="w-full py-6 btn-play text-white rounded-[2rem] font-black text-3xl italic">PLAY</button>
+                <button id="stopBtn" class="w-full py-2 text-slate-500 font-bold uppercase text-[9px] tracking-widest">Parar</button>
             </div>
         </div>
     </div>
 
-    <!-- Script de PDF embutido para evitar bloqueios do GitHub -->
-    <script src="https://cdnjs.cloudflare.com"></script>
-
     <script>
-        const FREQS = { 'C': -9, 'D': -7, 'E': -5, 'F': -4, 'G': -2, 'A': 0, 'B': 2 };
-        const SYLL = { 'C': 'Dó', 'D': 'Ré', 'E': 'Mi', 'F': 'Fá', 'G': 'Sol', 'A': 'Lá', 'B': 'Si' };
-        let audioCtx, queue = [], rodando = false;
+        const PITCHES = { 'C': -9, 'D': -7, 'E': -5, 'F': -4, 'G': -2, 'A': 0, 'B': 2 };
+        const NAMES = { 'C': 'Dó', 'D': 'Ré', 'E': 'Mi', 'F': 'Fá', 'G': 'Sol', 'A': 'Lá', 'B': 'Si' };
+        let audioCtx, osmd, musicalQueue = [], isPlaying = false;
+
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com';
+
+        window.onload = () => {
+            try { osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("osmdCanvas", { autoResize: true, drawTitle: false }); } 
+            catch(e) { console.error("Erro no motor de partitura."); }
+        };
 
         function insert(s) {
             const el = document.getElementById('textoInput');
-            el.setRangeText(s, el.selectionStart, el.selectionEnd, 'end');
+            const start = el.selectionStart;
+            el.value = el.value.slice(0, start) + s + el.value.slice(el.selectionEnd);
             el.focus();
+            el.selectionStart = el.selectionEnd = start + s.length;
         }
 
-        // CARREGAR PDF (Versão Blindada)
-        document.getElementById('fileInput').onchange = function(e) {
+        async function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+        }
+
+        document.getElementById('fileInput').onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            document.getElementById('msg').style.display = 'none';
+            document.getElementById('placeholderMsg').style.display = 'none';
             const reader = new FileReader();
-            reader.onload = function() {
-                const typedarray = new Uint8Array(this.result);
-                const pdfjsLib = window['pdfjs-dist/build/pdf'];
-                pdfjsLib.getDocument(typedarray).promise.then(pdf => {
-                    pdf.getPage(1).then(page => {
-                        const canvas = document.getElementById('pdfCanvas');
-                        const context = canvas.getContext('2d');
-                        const viewport = page.getViewport({scale: 1.5});
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
-                        page.render({canvasContext: context, viewport: viewport});
+
+            if (file.type === "application/pdf") {
+                reader.onload = function() {
+                    const typedarray = new Uint8Array(this.result);
+                    pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                        pdf.getPage(1).then(page => {
+                            const canvas = document.getElementById('pdfCanvas');
+                            canvas.style.display = 'block';
+                            const viewport = page.getViewport({scale: 1.5});
+                            canvas.height = viewport.height; canvas.width = viewport.width;
+                            page.render({canvasContext: canvas.getContext('2d'), viewport: viewport});
+                        });
                     });
-                });
-            };
-            reader.readAsArrayBuffer(file);
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.onload = async (ev) => {
+                    document.getElementById('pdfCanvas').style.display = 'none';
+                    await osmd.load(ev.target.result);
+                    osmd.render();
+                    parse();
+                };
+                reader.readAsText(file);
+            }
         };
 
-        function processarTexto() {
-            const raw = document.getElementById('textoInput').value.toUpperCase().match(/([A-G])([♯♭♮]?)/g);
-            if (raw) {
-                queue = raw.map(n => ({
-                    letra: n[0],
-                    mod: n.includes('♯') ? 1 : n.includes('♭') ? -1 : 0
-                }));
-                alert("Notas carregadas!");
-            }
+        function parse() {
+            musicalQueue = [];
+            osmd.GraphicSheet.MusicPages.forEach(p => p.MusicSystems.forEach(s => s.StaffLines.forEach(l => l.Measures.forEach(m => m.StaffEntries.forEach(e => {
+                const sn = e.ModelStaffEntry.sourceNotes;
+                if (sn && sn.length > 0) {
+                    const pitch = sn[0].Pitch;
+                    musicalQueue.push({ letra: "CDEFGAB"[pitch.fundamentalPitch], oitava: pitch.octave + 3, dur: e.ModelStaffEntry.Duration.RealValue, mod: pitch.accidental || 0 });
+                } else { musicalQueue.push({ dur: e.ModelStaffEntry.Duration.RealValue, tipo: 'pausa' }); }
+            })))));
         }
 
         function cantar(item, tempo) {
-            if (!audioCtx) audioCtx = new AudioContext();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
-            const base = parseInt(document.getElementById('calibRange').value);
-            const freq = base * Math.pow(2, (FREQS[item.letra] + item.mod) / 12);
+            const baseHz = parseInt(document.getElementById('calibRange').value);
+            const transp = parseInt(document.getElementById('transpRange').value);
+            const semitons = PITCHES[item.letra] + (item.oitava - 4) * 12 + transp + (item.mod || 0);
+            const freq = baseHz * Math.pow(2, semitons / 12);
 
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            
             osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
             gain.gain.setValueAtTime(0, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+            gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.05);
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + tempo);
 
-            const talk = new SpeechSynthesisUtterance(SYLL[item.letra]);
-            talk.lang = 'pt-BR';
-            window.speechSynthesis.speak(talk);
+            // SINCRONIA DA VOZ COM O BPM
+            window.speechSynthesis.cancel(); // Limpa filas atrasadas
+            const speech = new SpeechSynthesisUtterance(NAMES[item.letra]);
+            speech.lang = 'pt-BR';
+            // Ajusta a velocidade da fala de acordo com o tempo da nota
+            speech.rate = Math.min(2.5, Math.max(0.5, 1 / tempo)); 
+            window.speechSynthesis.speak(speech);
 
-            document.getElementById('vocalLabel').innerText = SYLL[item.letra] + (item.mod === 1 ? '♯' : item.mod === -1 ? '♭' : '');
+            document.getElementById('vocalLabel').innerText = NAMES[item.letra] + (item.mod === 1 ? '♯' : item.mod === -1 ? '♭' : '');
             document.getElementById('hzLabel').innerText = freq.toFixed(2) + " Hz";
 
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(); osc.stop(audioCtx.currentTime + tempo);
         }
 
-        async function iniciarSolfejo() {
-            if (rodando || queue.length === 0) {
-                if(queue.length === 0) processarTexto();
+        async function start() {
+            if (isPlaying || (musicalQueue.length === 0)) {
+                if (musicalQueue.length === 0) document.getElementById('processText').click();
+                if (musicalQueue.length === 0) return;
             }
-            rodando = true;
-            const bpm = document.getElementById('bpmRange').value;
-            const t = 60 / bpm;
-
-            for (let n of queue) {
-                if (!rodando) break;
-                cantar(n, t);
-                await new Promise(r => setTimeout(r, t * 1000));
+            await initAudio();
+            isPlaying = true;
+            for (let item of musicalQueue) {
+                if (!isPlaying) break;
+                const bpm = document.getElementById('bpmRange').value;
+                const d = item.dur * (60 / bpm) * 4;
+                if (!item.tipo) cantar(item, d);
+                await new Promise(r => setTimeout(r, d * 1000));
             }
-            rodando = false;
+            isPlaying = false;
         }
 
-        function parar() {
-            rodando = false;
-            window.speechSynthesis.cancel();
-        }
-
-        // ATUALIZAÇÃO DOS SLIDERS
+        document.getElementById('playBtn').onclick = start;
+        document.getElementById('stopBtn').onclick = () => { isPlaying = false; window.speechSynthesis.cancel(); };
         document.getElementById('bpmRange').oninput = (e) => document.getElementById('bpmText').innerText = e.target.value;
-        document.getElementById('calibRange').oninput = (e) => document.getElementById('calibText').innerText = e.target.value + "Hz";
+        document.getElementById('transpRange').oninput = (e) => document.getElementById('transpText').innerText = e.target.value;
+        document.getElementById('calibRange').oninput = (e) => {
+            document.getElementById('calibText').innerText = e.target.value + "Hz";
+            document.getElementById('hzLabel').innerText = "Ref: " + e.target.value + " Hz";
+        };
+        document.getElementById('processText').onclick = () => {
+            const raw = document.getElementById('textoInput').value.toUpperCase().match(/([A-G])([♯♭♮]?)/g);
+            if (raw) {
+                musicalQueue = raw.map(n => ({ letra: n[0], oitava: 4, dur: 1, mod: n.includes('♯') ? 1 : n.includes('♭') ? -1 : 0 }));
+            }
+        };
     </script>
 </body>
 </html>
