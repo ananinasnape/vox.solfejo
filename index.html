@@ -1,10 +1,207 @@
-voxsolfejo-maestro/
-│
-├─ index.html
-├─ README.md
-├─ assets/
-│   └─ (opcional: ícones, screenshots)
-├─ examples/
-│   └─ exemplo.musicxml
-└─ backend/
-    └─ (futuro: PDF → MusicXML)
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>VoxSolfejo Maestro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- OpenSheetMusicDisplay -->
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.4/build/opensheetmusicdisplay.min.js"></script>
+
+<style>
+body { background:#f1f5f9; font-family: Inter, system-ui; }
+.glass { background:rgba(255,255,255,.96); backdrop-filter: blur(12px); }
+.control-label { font-size:.65rem; font-weight:800; color:#64748b; text-transform:uppercase; }
+</style>
+</head>
+
+<body class="p-4">
+
+<div class="max-w-6xl mx-auto glass rounded-3xl shadow-xl overflow-hidden">
+
+<header class="bg-indigo-600 text-white p-6 flex justify-between items-center">
+  <div>
+    <h1 class="text-2xl font-black italic">VOXSOLFEJO MAESTRO</h1>
+    <p class="text-xs opacity-80 uppercase tracking-widest">
+      Solfejo vocal afinado por partitura
+    </p>
+  </div>
+  <label class="bg-white text-indigo-600 px-4 py-2 rounded-full font-bold cursor-pointer">
+    Abrir MusicXML
+    <input type="file" id="fileInput" class="hidden" accept=".xml,.musicxml,.mxl">
+  </label>
+</header>
+
+<div class="grid grid-cols-1 lg:grid-cols-4">
+
+<!-- Editor Manual -->
+<div class="p-4 bg-slate-50 border-r">
+  <label class="control-label block mb-2 text-center">Editor Manual</label>
+  <textarea id="textoInput"
+    class="w-full h-36 p-3 rounded-xl font-mono"
+  >C D E F G A B</textarea>
+
+  <button id="processarTexto"
+    class="w-full mt-3 bg-slate-800 text-white py-2 rounded-xl text-xs font-bold uppercase">
+    Interpretar Texto
+  </button>
+</div>
+
+<!-- Partitura -->
+<div class="lg:col-span-2 p-4">
+  <div id="osmdCanvas"
+    class="bg-white rounded-2xl min-h-[320px] border flex items-center justify-center text-slate-300 italic">
+    Carregue uma partitura MusicXML
+  </div>
+</div>
+
+<!-- Controles -->
+<div class="p-4 bg-slate-50 border-l space-y-4">
+
+<div class="bg-slate-900 rounded-2xl p-4 text-center text-white">
+  <div id="vocalLabel" class="text-5xl font-black">—</div>
+</div>
+
+<div>
+  <div class="flex justify-between">
+    <span class="control-label">BPM</span>
+    <span id="bpmText" class="font-bold text-indigo-600">80</span>
+  </div>
+  <input type="range" id="bpmRange" min="40" max="200" value="80" class="w-full">
+</div>
+
+<div>
+  <div class="flex justify-between">
+    <span class="control-label">Transposição</span>
+    <span id="transposeText" class="font-bold text-indigo-600">0</span>
+  </div>
+  <input type="range" id="transposeRange" min="-12" max="12" value="0" class="w-full">
+</div>
+
+<div>
+  <div class="flex justify-between">
+    <span class="control-label">Afinação</span>
+    <span id="hzText" class="font-bold text-indigo-600">440Hz</span>
+  </div>
+  <input type="range" id="hzRange" min="415" max="466" value="440" class="w-full">
+</div>
+
+<button id="playBtn"
+  class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-xl">
+  PLAY
+</button>
+
+<button id="stopBtn"
+  class="w-full bg-white border py-2 rounded-xl text-xs uppercase">
+  Parar
+</button>
+
+</div>
+</div>
+</div>
+
+<script>
+/* ===== CONFIG ===== */
+const SOLFEGE = { C:'Dó', D:'Ré', E:'Mi', F:'Fá', G:'Sol', A:'Lá', B:'Si' };
+const REF = { C:-9, D:-7, E:-5, F:-4, G:-2, A:0, B:2 };
+
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let queue = [];
+let running = false;
+
+/* ===== OSMD ===== */
+const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(
+  "osmdCanvas",
+  { drawTitle:false, autoResize:true }
+);
+
+/* ===== FREQUÊNCIA ===== */
+function freqNota(letra, oitava, acidente, transp, baseHz){
+  let s = REF[letra] + (oitava-4)*12 + transp;
+  if(acidente===1) s++;
+  if(acidente===-1) s--;
+  return baseHz * Math.pow(2, s/12);
+}
+
+/* ===== VOZ CANTADA ===== */
+function cantar(nota, dur){
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = "sawtooth";
+  osc.frequency.value = nota.freq;
+
+  gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime+0.05);
+  gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime+dur);
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.start();
+  osc.stop(audioCtx.currentTime + dur);
+
+  vocalLabel.innerText = nota.nome;
+}
+
+/* ===== PLAY ===== */
+async function play(){
+  if(running || queue.length===0) return;
+  running = true;
+  await audioCtx.resume();
+
+  for(const n of queue){
+    if(!running) break;
+    cantar(n, n.dur);
+    await new Promise(r=>setTimeout(r, n.dur*1000));
+  }
+  running = false;
+}
+
+/* ===== TEXTO ===== */
+processarTexto.onclick = ()=>{
+  const bpm = Number(bpmRange.value);
+  const hz = Number(hzRange.value);
+  const tr = Number(transposeRange.value);
+
+  const notas = textoInput.value.match(/[A-G][#b]?/g);
+  queue = [];
+
+  if(!notas) return;
+
+  notas.forEach(n=>{
+    const letra = n[0];
+    const ac = n.includes('#')?1:n.includes('b')?-1:0;
+    queue.push({
+      nome: SOLFEGE[letra],
+      freq: freqNota(letra,4,ac,tr,hz),
+      dur: 60/bpm
+    });
+  });
+};
+
+/* ===== MUSICXML ===== */
+fileInput.onchange = async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+
+  const text = await file.text();
+  await osmd.load(text);
+  osmd.render();
+
+  queue = []; // (extração musical virá depois)
+};
+
+/* ===== UI ===== */
+playBtn.onclick = play;
+stopBtn.onclick = ()=>running=false;
+bpmRange.oninput = e=>bpmText.innerText=e.target.value;
+transposeRange.oninput = e=>transposeText.innerText=e.target.value;
+hzRange.oninput = e=>hzText.innerText=e.target.value+"Hz";
+</script>
+
+</body>
+</html>
