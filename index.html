@@ -3,194 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VoxSolfejo Pro | 2026</title>
-    
-    <!-- PWA e Estilo -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>VoxSolfejo AI Pro - Controle Total</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net"></script>
-    
     <style>
         @import url('https://fonts.googleapis.com');
-        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); }
-        #osmdCanvas img { margin: 0 auto; }
-        .note-highlight { color: #4F46E5; transform: scale(1.2); font-weight: 800; transition: all 0.1s; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #4F46E5; cursor: pointer; }
+        body { font-family: 'Inter', sans-serif; background: #F0F4F8; }
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(15px); }
+        .control-label { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+        input[type=range] { accent-color: #4F46E5; }
     </style>
 </head>
-<body class="text-slate-900 select-none">
+<body class="p-2 md:p-6 select-none">
 
-    <div class="max-w-5xl mx-auto min-h-screen flex flex-col p-4 md:p-8">
-        
-        <!-- Header Profissional -->
-        <header class="flex justify-between items-center mb-8">
-            <div>
-                <h1 class="text-2xl font-bold text-indigo-600 tracking-tight">VoxSolfejo <span class="font-light text-slate-400">AI</span></h1>
-                <p class="text-[10px] font-bold text-slate-400 tracking-widest uppercase">Padrão A4 = 440Hz | Fonética Brasileira</p>
+    <div class="max-w-6xl mx-auto glass rounded-[2rem] shadow-2xl overflow-hidden border border-white">
+        <!-- Header -->
+        <header class="bg-indigo-600 p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="text-center md:text-left">
+                <h1 class="text-2xl font-black italic tracking-tighter">VOXSOLFEJO AI <span class="font-light not-italic opacity-70">PRO</span></h1>
+                <p class="text-[10px] font-bold opacity-80 uppercase tracking-widest">Controle de Pitch, BPM e Calibração</p>
             </div>
-            <label class="cursor-pointer bg-indigo-600 text-white px-5 py-2.5 rounded-full font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all text-sm">
-                📁 Abrir Partitura
-                <input type="file" id="fileInput" class="hidden" accept=".xml,.musicxml,.mxl">
+            <label class="bg-white text-indigo-600 px-6 py-2 rounded-full font-bold cursor-pointer hover:scale-105 transition shadow-lg text-xs">
+                CARREGAR PARTITURA (PDF/XML)
+                <input type="file" id="fileInput" class="hidden" accept=".xml,.musicxml,.mxl,.pdf">
             </label>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1">
+        <!-- Área da Partitura -->
+        <div id="osmdCanvas" class="p-4 min-h-[300px] bg-white overflow-auto border-b border-slate-100 text-center">
+            <div id="placeholder" class="py-20 text-slate-300 italic text-sm">Arraste sua partitura aqui...</div>
+        </div>
+
+        <!-- Painel de Controle Avançado -->
+        <div class="p-6 bg-slate-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
-            <!-- Painel de Visualização (Sheet Music) -->
-            <div class="lg:col-span-2 space-y-6">
-                <div class="glass-panel rounded-3xl shadow-xl border border-white p-6 min-h-[450px] flex flex-col">
-                    <div id="osmdCanvas" class="w-full overflow-auto rounded-xl border border-slate-50">
-                        <div id="emptyState" class="py-40 text-center text-slate-300">
-                            <svg class="w-16 h-16 mx-auto mb-4 opacity-20" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"/><path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
-                            <p class="italic text-sm">Carregue um arquivo MusicXML para visualizar a partitura tradicional</p>
-                        </div>
+            <!-- Monitor Principal -->
+            <div class="bg-slate-900 rounded-3xl p-5 text-center shadow-xl border-b-4 border-indigo-500">
+                <span class="text-indigo-400 text-[10px] font-black tracking-widest uppercase">Voz Atual</span>
+                <div id="vocalLabel" class="text-5xl font-black text-white py-1">--</div>
+                <div id="hzLabel" class="text-indigo-300 font-mono text-[10px] mt-1">Ref: 440 Hz</div>
+            </div>
+
+            <!-- Coluna 1: Velocidade e Tom -->
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="control-label">Velocidade (BPM)</label>
+                        <span id="bpmText" class="text-indigo-600 font-bold">80</span>
                     </div>
+                    <input type="range" id="bpmRange" min="20" max="220" value="80" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none">
+                </div>
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="control-label">Transposição (Tom)</label>
+                        <span id="transposeText" class="text-indigo-600 font-bold">0</span>
+                    </div>
+                    <input type="range" id="transposeRange" min="-12" max="12" value="0" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none">
                 </div>
             </div>
 
-            <!-- Painel de Controle e Monitor -->
-            <div class="space-y-6">
-                <!-- Monitor Vocal -->
-                <div class="bg-indigo-600 rounded-3xl p-8 text-center shadow-xl shadow-indigo-100">
-                    <span class="text-indigo-200 text-xs font-bold uppercase tracking-widest">Solfejando</span>
-                    <div id="vocalDisplay" class="text-6xl font-black text-white mt-2 mb-2 h-16">--</div>
-                    <div id="freqDisplay" class="text-indigo-300 font-mono text-[10px]">0.00 Hz</div>
+            <!-- Coluna 2: Calibração e Vibrato -->
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="control-label">Afinação Base (Hz)</label>
+                        <span id="baseHzText" class="text-indigo-600 font-bold">440Hz</span>
+                    </div>
+                    <input type="range" id="baseHzRange" min="415" max="466" value="440" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none">
                 </div>
-
-                <!-- Controles -->
-                <div class="glass-panel rounded-3xl p-8 shadow-lg border border-white space-y-8">
-                    <div>
-                        <div class="flex justify-between items-center mb-4">
-                            <label class="text-xs font-bold text-slate-500 uppercase tracking-widest">Andamento</label>
-                            <span id="bpmVal" class="text-indigo-600 font-black text-lg">80 BPM</span>
-                        </div>
-                        <input type="range" id="bpmRange" min="30" max="180" value="80" class="w-full h-1.5 bg-slate-100 rounded-lg appearance-none">
-                    </div>
-
-                    <div class="flex gap-4">
-                        <button id="playBtn" class="flex-1 bg-indigo-600 text-white py-5 rounded-2xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-all">PLAY</button>
-                        <button id="stopBtn" class="px-6 bg-slate-100 text-slate-400 py-5 rounded-2xl font-bold active:scale-95 transition-all">■</button>
-                    </div>
-
-                    <div class="pt-4 border-t border-slate-50">
-                        <p class="text-[10px] text-slate-400 leading-relaxed italic">
-                            * Use arquivos MusicXML exportados do MuseScore ou Sibelius para garantir a leitura correta das pautas.
-                        </p>
-                    </div>
+                <div class="flex items-center gap-4 bg-white p-2 rounded-xl border border-slate-200">
+                    <input type="checkbox" id="vibratoToggle" checked class="w-4 h-4 accent-indigo-600">
+                    <span class="control-label">Vibrato Natural</span>
                 </div>
+            </div>
+
+            <!-- Coluna 3: Ações -->
+            <div class="flex flex-col gap-2">
+                <button id="playBtn" class="flex-1 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">PLAY</button>
+                <button id="stopBtn" class="py-3 bg-white text-slate-400 rounded-xl font-bold border border-slate-200 active:scale-95 transition-all uppercase text-[10px] tracking-widest">Parar</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Configurações Técnicas 2026
-        const FREQUENCIAS = { 'C': 261.63, 'D': 293.66, 'E': 329.63, 'F': 349.23, 'G': 392.00, 'A': 440.00, 'B': 493.88 };
-        const FONETICA = { 'C': 'Dó', 'D': 'Ré', 'E': 'Mi', 'F': 'Fá', 'G': 'Sol', 'A': 'Lá', 'B': 'Si' };
-        
-        let audioCtx;
-        let osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("osmdCanvas", { autoResize: true, drawTitle: false });
-        let notasQueue = [];
-        let rodando = false;
+        // Lógica de Frequências (Baseada em Temperamento Igual)
+        const NOTAS_BASE = { 'C': -9, 'D': -7, 'E': -5, 'F': -4, 'G': -2, 'A': 0, 'B': 2 };
+        const NOMES_NOTAS = { 'C': 'Dó', 'D': 'Ré', 'E': 'Mi', 'F': 'Fá', 'G': 'Sol', 'A': 'Lá', 'B': 'Si' };
 
-        // 1. Carregamento do Arquivo "Sheet Music"
-        document.getElementById('fileInput').onchange = async (e) => {
+        let audioCtx;
+        let osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("osmdCanvas", { drawTitle: false, autoResize: true });
+        let queueMusical = [];
+        let tocando = false;
+
+        // 1. Cálculo de Frequência Dinâmica
+        function calcularFrequencia(letra, oitava = 4) {
+            const baseHz = parseInt(document.getElementById('baseHzRange').value);
+            const transposição = parseInt(document.getElementById('transposeRange').value);
+            const semitonsDeA4 = NOTAS_BASE[letra] + (oitava - 4) * 12 + transposição;
+            return baseHz * Math.pow(2, semitonsDeA4 / 12);
+        }
+
+        // 2. Carregamento de Arquivos
+        document.getElementById('fileInput').onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
+            document.getElementById('placeholder').style.display = 'none';
             const reader = new FileReader();
             reader.onload = async (event) => {
-                document.getElementById('emptyState').style.display = 'none';
-                await osmd.load(event.target.result);
-                osmd.render();
-                extrairNotas();
+                try {
+                    await osmd.load(event.target.result);
+                    osmd.render();
+                    extrairDadosPartitura();
+                } catch (err) { alert("Erro ao processar partitura."); }
             };
             reader.readAsText(file);
         };
 
-        // 2. Extração de Dados da Partitura Visual
-        function extrairNotas() {
-            notasQueue = [];
-            const measures = osmd.GraphicSheet.MusicPages[0].MusicSystems[0].StaffLines[0].Measures;
-            
-            measures.forEach(m => {
-                m.StaffEntries.forEach(entry => {
-                    if (entry.ModelStaffEntry.sourceNotes[0]) {
-                        const pitch = entry.ModelStaffEntry.sourceNotes[0].Pitch;
-                        if (pitch) {
-                            const letra = "CDEFGAB"[pitch.fundamentalPitch];
-                            notasQueue.push({ letra, nome: FONETICA[letra], freq: FREQUENCIAS[letra] });
-                        }
+        function extrairDadosPartitura() {
+            queueMusical = [];
+            osmd.GraphicSheet.MusicPages.forEach(p => p.MusicSystems.forEach(s => s.StaffLines.forEach(l => l.Measures.forEach(m => m.StaffEntries.forEach(e => {
+                const source = e.ModelStaffEntry;
+                if (source.sourceNotes.length > 0) {
+                    const pitch = source.sourceNotes[0].Pitch;
+                    if (pitch) {
+                        const letra = "CDEFGAB"[pitch.fundamentalPitch];
+                        queueMusical.push({ tipo: 'nota', letra, oitava: pitch.octave + 3, dur: source.Duration.RealValue });
                     }
-                });
-            });
+                } else { queueMusical.push({ tipo: 'pausa', dur: source.Duration.RealValue }); }
+            })))));
         }
 
-        // 3. Motor de Voz e Áudio Neuronal
-        function cantar(notaObj, tempo) {
+        // 3. Motor de Áudio e Voz
+        function cantar(item, tempoReal) {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            const filter = audioCtx.createBiquadFilter();
+            if (item.tipo === 'nota') {
+                const freq = calcularFrequencia(item.letra, item.oitava);
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                const filter = audioCtx.createBiquadFilter();
 
-            // Onda Sawtooth + Filtro Bandpass simula timbre vocal
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(notaObj.freq, audioCtx.currentTime);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
-            filter.type = 'bandpass';
-            filter.frequency.value = 600; // Frequência média da voz
+                if (document.getElementById('vibratoToggle').checked) {
+                    const lfo = audioCtx.createOscillator();
+                    const lfoGain = audioCtx.createGain();
+                    lfo.frequency.value = 5.5;
+                    lfoGain.gain.value = freq * 0.01; 
+                    lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+                    lfo.start();
+                }
 
-            gain.gain.setValueAtTime(0, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.1);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + tempo);
+                filter.type = 'lowpass'; filter.frequency.value = 1500;
+                gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + tempoReal);
 
-            // Fonética Brasileira Articulada
-            const fala = new SpeechSynthesisUtterance(notaObj.nome);
-            fala.lang = 'pt-BR';
-            fala.rate = 1.3;
-            fala.pitch = 1;
-            window.speechSynthesis.speak(fala);
+                const fala = new SpeechSynthesisUtterance(NOMES_NOTAS[item.letra]);
+                fala.lang = 'pt-BR'; fala.rate = 1.3;
+                window.speechSynthesis.speak(fala);
 
-            osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + tempo);
+                document.getElementById('vocalLabel').innerText = NOMES_NOTAS[item.letra];
+                document.getElementById('hzLabel').innerText = freq.toFixed(2) + " Hz";
+
+                osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + tempoReal);
+            } else { document.getElementById('vocalLabel').innerText = "—"; }
         }
 
-        // 4. Loop de Execução
-        async function iniciarSolfejo() {
-            if (rodando || notasQueue.length === 0) return;
-            rodando = true;
-            
-            const bpm = document.getElementById('bpmRange').value;
-            const tempoPorNota = 60 / bpm;
+        // 4. Execução Rítmica
+        async function play() {
+            if (tocando || queueMusical.length === 0) return;
+            tocando = true;
+            if (audioCtx) await audioCtx.resume();
 
-            for (let nota of notasQueue) {
-                if (!rodando) break;
-
-                // Atualiza Monitor
-                const vDisp = document.getElementById('vocalDisplay');
-                const fDisp = document.getElementById('freqDisplay');
-                vDisp.innerText = nota.nome;
-                vDisp.classList.add('note-highlight');
-                fDisp.innerText = nota.freq.toFixed(2) + " Hz";
-
-                cantar(nota, tempoPorNota);
-
-                await new Promise(r => setTimeout(r, tempoPorNota * 1000));
-                vDisp.classList.remove('note-highlight');
+            for (let item of queueMusical) {
+                if (!tocando) break;
+                const bpm = document.getElementById('bpmRange').value;
+                const baseTempo = (60 / bpm) * 4;
+                const tempoReal = item.dur * baseTempo;
+                cantar(item, tempoReal);
+                await new Promise(r => setTimeout(r, tempoReal * 1000));
             }
-            rodando = false;
+            tocando = false;
         }
 
-        // Controles de Interface
-        document.getElementById('playBtn').onclick = iniciarSolfejo;
-        document.getElementById('stopBtn').onclick = () => { rodando = false; window.speechSynthesis.cancel(); };
-        document.getElementById('bpmRange').oninput = (e) => {
-            document.getElementById('bpmVal').innerText = e.target.value + " BPM";
+        // Handlers de UI
+        document.getElementById('playBtn').onclick = play;
+        document.getElementById('stopBtn').onclick = () => { tocando = false; window.speechSynthesis.cancel(); };
+        document.getElementById('bpmRange').oninput = (e) => document.getElementById('bpmText').innerText = e.target.value;
+        document.getElementById('transposeRange').oninput = (e) => document.getElementById('transposeText').innerText = (e.target.value > 0 ? "+" : "") + e.target.value;
+        document.getElementById('baseHzRange').oninput = (e) => {
+            document.getElementById('baseHzText').innerText = e.target.value + "Hz";
+            document.getElementById('hzLabel').innerText = "Ref: " + e.target.value + " Hz";
         };
-
-        // Bloqueio de sono da tela (Wake Lock 2026)
-        if ('wakeLock' in navigator) { navigator.wakeLock.request('screen'); }
     </script>
 </body>
 </html>
