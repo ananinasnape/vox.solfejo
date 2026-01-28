@@ -10,7 +10,7 @@
 
 <style>
 body { background:#0f172a; color:white; }
-button:disabled { opacity:.4; }
+button:disabled { opacity:.4; cursor:not-allowed; }
 </style>
 </head>
 
@@ -18,7 +18,7 @@ button:disabled { opacity:.4; }
 
 <h1 class="text-2xl font-black text-center">🎶 VoxSolfejo</h1>
 
-<input type="file" id="fileInput" accept=".xml,.musicxml"
+<input type="file" id="fileInput" accept=".xml,.musicxml,.mxl"
   class="block w-full text-sm mb-2">
 
 <div class="flex gap-3">
@@ -52,7 +52,7 @@ const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
   drawTitle: false
 });
 
-/* ================= TEST SOUND ================= */
+/* ===== TEST SOUND ===== */
 document.getElementById("testSound").onclick = async () => {
   if (!audioCtx) audioCtx = new AudioContext();
   await audioCtx.resume();
@@ -63,43 +63,47 @@ document.getElementById("testSound").onclick = async () => {
   o.stop(audioCtx.currentTime + .3);
 };
 
-/* ================= LOAD FILE ================= */
+/* ===== LOAD FILE ===== */
 document.getElementById("fileInput").onchange = async e => {
   const file = e.target.files[0];
   if (!file) return;
 
-  await osmd.load(await file.text());
+  await osmd.load(await file.arrayBuffer());
   osmd.render();
-  extrairNotas();
+
+  extrairNotasCorretamente();
+
+  console.log("Notas extraídas:", queue.length);
 
   document.getElementById("playBtn").disabled = queue.length === 0;
 };
 
-/* ================= EXTRACT ================= */
-function extrairNotas() {
+/* ===== EXTRAÇÃO CORRETA (API REAL) ===== */
+function extrairNotasCorretamente() {
   queue = [];
 
-  osmd.Sheet.SourceMeasures.forEach(m => {
-    m.VerticalSourceStaffEntryContainers.forEach(v => {
-      v.SourceStaffEntry?.VoiceEntries.forEach(ve => {
-        const dur = ve.Duration?.RealValue || 0;
-        ve.Notes.forEach(n => {
-          if (!n.Pitch) return;
-          queue.push({
-            letra: n.Pitch.FundamentalNote,
-            oitava: n.Pitch.Octave,
-            acidente: n.Pitch.Accidental || 0,
-            dur
+  osmd.GraphicSheet.MeasureList.forEach(medidas => {
+    medidas.forEach(m => {
+      m.staffEntries.forEach(se => {
+        se.graphicalVoiceEntries.forEach(gve => {
+          gve.notes.forEach(gn => {
+            const p = gn.sourceNote?.Pitch;
+            if (!p) return;
+
+            queue.push({
+              letra: p.FundamentalNote,
+              oitava: p.Octave,
+              acidente: p.Accidental || 0,
+              dur: gn.sourceNote.Length.RealValue
+            });
           });
         });
       });
     });
   });
-
-  console.log("Notas prontas:", queue.length);
 }
 
-/* ================= PLAY ================= */
+/* ===== PLAY ===== */
 document.getElementById("playBtn").onclick = async () => {
   if (!audioCtx) audioCtx = new AudioContext();
   await audioCtx.resume();
