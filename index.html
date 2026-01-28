@@ -22,7 +22,7 @@ button { touch-action: manipulation; }
 </header>
 
 <section class="flex flex-col sm:flex-row gap-3">
-  <input type="file" id="fileInput" accept=".musicxml,.xml,.mxl"
+  <input type="file" id="fileInput" accept=".musicxml,.xml"
     class="block w-full text-sm" />
   <button id="playBtn"
     class="bg-indigo-600 px-6 py-3 rounded-xl font-bold">
@@ -44,104 +44,37 @@ button { touch-action: manipulation; }
 <div id="score" class="bg-white rounded-xl p-3 text-black"></div>
 
 <script>
+/* ======================
+   SETUP
+====================== */
 const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
   autoResize: true,
   drawTitle: false
 });
 
 let queue = [];
-let audioCtx;
+let audioCtx = null;
 
 const NOTAS = ['C','D','E','F','G','A','B'];
 const SOLFEJO = {C:'Dó',D:'Ré',E:'Mi',F:'Fá',G:'Sol',A:'Lá',B:'Si'};
 const REF = {C:-9,D:-7,E:-5,F:-4,G:-2,A:0,B:2};
 
+/* ======================
+   LOAD MUSICXML
+====================== */
 document.getElementById("fileInput").onchange = async e => {
   const file = e.target.files[0];
   if (!file) return;
+
   await osmd.load(await file.text());
   osmd.render();
   extrairNotas();
 };
 
+/* ======================
+   EXTRACT NOTES
+====================== */
 function extrairNotas() {
   queue = [];
-  const sheet = osmd.GraphicSheet;
-  sheet.MusicPages.forEach(p =>
-    p.MusicSystems.forEach(sys =>
-      sys.StaffLines.forEach(staff =>
-        staff.Measures.forEach(m =>
-          m.StaffEntries.forEach(se => {
-            const src = se.ModelStaffEntry;
-            const dur = src.Duration?.RealValue || 0;
-            if (!src.sourceNotes?.length) {
-              queue.push({tipo:'pausa', dur});
-              return;
-            }
-            const n = src.sourceNotes[0];
-            queue.push({
-              tipo:'nota',
-              letra: NOTAS[n.Pitch.fundamentalPitch],
-              oitava: n.Pitch.octave + 3,
-              acidente: n.Pitch.accidental || 0,
-              dur
-            });
-          })
-        )
-      )
-    )
-  );
-}
 
-function freq(letra, oit, acc) {
-  const base = +document.getElementById("hz").value;
-  let s = REF[letra] + (oit-4)*12 + acc;
-  return base * Math.pow(2, s/12);
-}
-
-async function cantar(item, tempo) {
-  if (!audioCtx) audioCtx = new AudioContext();
-  await audioCtx.resume();
-
-  if (item.tipo === 'pausa') {
-    return new Promise(r => setTimeout(r, tempo*1000));
-  }
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = "triangle"; // mais vocal
-  osc.frequency.value = freq(item.letra,item.oitava,item.acidente);
-
-  gain.gain.setValueAtTime(0, audioCtx.currentTime);
-  gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime+0.05);
-  gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime+tempo);
-
-  osc.connect(gain).connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime+tempo);
-
-  const fala = new SpeechSynthesisUtterance(SOLFEJO[item.letra]);
-  fala.lang = "pt-BR";
-  fala.rate = 1.1;
-  speechSynthesis.speak(fala);
-
-  return new Promise(r => setTimeout(r, tempo*1000));
-}
-
-document.getElementById("playBtn").onclick = async () => {
-  const bpm = +document.getElementById("bpm").value;
-  for (const n of queue) {
-    const tempo = n.dur * (60/bpm) * 4;
-    await cantar(n, tempo);
-  }
-};
-
-["bpm","hz"].forEach(id =>
-  document.getElementById(id).oninput = e =>
-    document.getElementById(id+"Val").textContent = e.target.value
-);
-</script>
-
-</body>
-</html>
+  const sheet
