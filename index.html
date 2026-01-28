@@ -22,13 +22,11 @@ button { touch-action: manipulation; }
   class="block w-full text-sm mb-2">
 
 <div class="flex gap-3">
-  <button id="testSound"
-    class="bg-green-600 px-4 py-2 rounded font-bold">
+  <button id="testSound" class="bg-green-600 px-4 py-2 rounded font-bold">
     🔊 TESTAR SOM
   </button>
 
-  <button id="playBtn"
-    class="bg-indigo-600 px-4 py-2 rounded font-bold">
+  <button id="playBtn" class="bg-indigo-600 px-4 py-2 rounded font-bold">
     ▶ PLAY
   </button>
 </div>
@@ -43,20 +41,10 @@ button { touch-action: manipulation; }
 <div id="score" class="bg-white text-black rounded-xl p-3"></div>
 
 <script>
-/* ================= SETUP ================= */
+/* ================= AUDIO ================= */
 let audioCtx = null;
-let queue = [];
 
-const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
-  drawTitle:false,
-  autoResize:true
-});
-
-const NOTAS = ['C','D','E','F','G','A','B'];
-const REF = {C:-9,D:-7,E:-5,F:-4,G:-2,A:0,B:2};
-const SOLFEJO = {C:'Dó',D:'Ré',E:'Mi',F:'Fá',G:'Sol',A:'Lá',B:'Si'};
-
-/* ================= AUDIO TEST ================= */
+/* ================= TEST SOUND ================= */
 document.getElementById("testSound").onclick = async () => {
   if (!audioCtx) audioCtx = new AudioContext();
   await audioCtx.resume();
@@ -64,15 +52,24 @@ document.getElementById("testSound").onclick = async () => {
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
 
-  osc.type = "sine";
   osc.frequency.value = 440;
-
   gain.gain.value = 0.4;
 
   osc.connect(gain).connect(audioCtx.destination);
   osc.start();
-  osc.stop(audioCtx.currentTime + 0.5);
+  osc.stop(audioCtx.currentTime + 0.4);
 };
+
+/* ================= OSMD ================= */
+const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
+  autoResize: true,
+  drawTitle: false
+});
+
+let queue = [];
+
+const SOLFEJO = ['Dó','Ré','Mi','Fá','Sol','Lá','Si'];
+const REF = [-9,-7,-5,-4,-2,0,2];
 
 /* ================= LOAD XML ================= */
 document.getElementById("fileInput").onchange = async e => {
@@ -81,78 +78,49 @@ document.getElementById("fileInput").onchange = async e => {
 
   await osmd.load(await file.text());
   osmd.render();
-  extrair();
+  extrairNotasCorretamente();
 };
 
-/* ================= EXTRACT NOTES ================= */
-function extrair() {
+/* ================= EXTRAÇÃO CORRETA ================= */
+function extrairNotasCorretamente() {
   queue = [];
-  const sheet = osmd.GraphicSheet;
 
-  sheet.MusicPages.forEach(p =>
-    p.MusicSystems.forEach(sys =>
-      sys.StaffLines.forEach(st =>
-        st.Measures.forEach(m =>
-          m.StaffEntries.forEach(se => {
-            const src = se.ModelStaffEntry;
-            const dur = src.Duration?.RealValue || 0;
+  const measures = osmd.Sheet.SourceMeasures;
 
-            if (!src.sourceNotes?.length) {
-              queue.push({tipo:'pausa', dur});
-              return;
-            }
+  measures.forEach(measure => {
+    measure.VerticalSourceStaffEntryContainers.forEach(v => {
+      v.SourceStaffEntry?.VoiceEntries.forEach(ve => {
+        const dur = ve.Duration?.RealValue || 0;
 
-            const n = src.sourceNotes[0];
-            queue.push({
-              tipo:'nota',
-              letra: NOTAS[n.Pitch.fundamentalPitch],
-              oitava: n.Pitch.octave + 3,
-              acidente: n.Pitch.accidental || 0,
-              dur
-            });
-          })
-        )
-      )
-    )
-  );
+        ve.Notes.forEach(n => {
+          if (!n.Pitch) return;
+
+          queue.push({
+            letra: n.Pitch.FundamentalNote,
+            oitava: n.Pitch.Octave,
+            acidente: n.Pitch.Accidental || 0,
+            dur
+          });
+        });
+      });
+    });
+  });
+
+  console.log("Notas extraídas:", queue.length);
 }
 
-/* ================= FREQ ================= */
-function freq(l,o,a) {
-  return 440 * Math.pow(2,(REF[l]+(o-4)*12+a)/12);
-}
-
-/* ================= PLAY NOTE ================= */
-async function tocar(n, tempo) {
-  if (n.tipo === 'pausa') {
-    return new Promise(r => setTimeout(r, tempo*1000));
-  }
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = "triangle";
-  osc.frequency.value = freq(n.letra,n.oitava,n.acidente);
-
-  gain.gain.setValueAtTime(0, audioCtx.currentTime);
-  gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime+0.05);
-  gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime+tempo);
-
-  osc.connect(gain).connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime+tempo);
-
-  speechSynthesis.speak(
-    new SpeechSynthesisUtterance(SOLFEJO[n.letra])
+/* ================= FREQUÊNCIA ================= */
+function freq(n) {
+  return 440 * Math.pow(
+    2,
+    (REF[n.letra] + (n.oitava - 4) * 12 + n.acidente) / 12
   );
-
-  return new Promise(r => setTimeout(r, tempo*1000));
 }
 
 /* ================= PLAY ================= */
 document.getElementById("playBtn").onclick = async () => {
   if (!queue.length) {
-    alert("Carregue um MusicXML primeiro.");
+    alert("Partitura carregada, mas sem notas executáveis.");
     return;
   }
 
@@ -162,14 +130,10 @@ document.getElementById("playBtn").onclick = async () => {
   const bpm = +document.getElementById("bpm").value;
 
   for (const n of queue) {
-    const t = n.dur * (60/bpm) * 4;
-    await tocar(n, t);
-  }
-};
+    const tempo = n.dur * (60 / bpm) * 4;
 
-document.getElementById("bpm").oninput = e =>
-  document.getElementById("bpmVal").innerText = e.target.value;
-</script>
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
 
-</body>
-</html>
+    osc.type = "triangle";
+    osc.frequ
