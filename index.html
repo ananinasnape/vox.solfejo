@@ -1,13 +1,49 @@
-<div>
-  <label class="control-label mb-1 block">Tonalidade</label>
-  <select id="keySelect"
-    class="w-full p-2 rounded-xl border border-slate-200 text-sm font-bold">
-    <option value="0">Dó Maior (C)</option>
-    <option value="2">Ré Maior (D)</option>
-    <option value="4">Mi Maior (E)</option>
-    <option value="5">Fá Maior (F)</option>
-    <option value="7">Sol Maior (G)</option>
-    <option value="9">Lá Maior (A)</option>
-    <option value="11">Si Maior (B)</option>
-  </select>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>VoxSolfejo Maestro</title>
+
+<!-- UI -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- MusicXML Render -->
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.0/build/opensheetmusicdisplay.min.js"></script>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4f46e5">
+
+<style>
+body { background:#f1f5f9; font-family: system-ui; }
+.control-label {
+  font-size: .65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #64748b;
+}
+</style>
+</head>
+
+<body class="min-h-screen flex flex-col">
+
+<header class="p-4 bg-indigo-600 text-white flex justify-between items-center">
+  <h1 class="font-black uppercase tracking-tight">VoxSolfejo</h1>
+  <input type="file" id="pdfInput" accept=".pdf,.xml,.musicxml"
+    class="text-xs"/>
+</header>
+
+<main class="flex-1 p-3 space-y-4">
+
+<!-- PARTITURA -->
+<div id="score"
+  class="bg-white rounded-xl shadow p-2 overflow-auto min-h-[280px]">
+  <div class="text-slate-300 text-center pt-24 text-sm">
+    Envie uma partitura
+  </div>
 </div>
+
+<!-- DISPLAY -->
+<div class="bg-slate-900 text-white rounded-xl p-4 text-center">
+  <div id="not
