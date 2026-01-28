@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VoxSolfejo</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -16,65 +16,131 @@ button { touch-action: manipulation; }
 
 <body class="p-4 max-w-4xl mx-auto space-y-4">
 
-<header class="text-center space-y-1">
-  <h1 class="text-2xl font-black">🎶 VoxSolfejo</h1>
-  <p class="text-xs opacity-70">Solfejo vocal respeitando a partitura</p>
-</header>
+<h1 class="text-2xl font-black text-center">🎶 VoxSolfejo</h1>
 
-<section class="flex flex-col sm:flex-row gap-3">
-  <input type="file" id="fileInput" accept=".musicxml,.xml"
-    class="block w-full text-sm" />
+<input type="file" id="fileInput" accept=".xml,.musicxml"
+  class="block w-full text-sm mb-2">
+
+<div class="flex gap-3">
+  <button id="testSound"
+    class="bg-green-600 px-4 py-2 rounded font-bold">
+    🔊 TESTAR SOM
+  </button>
+
   <button id="playBtn"
-    class="bg-indigo-600 px-6 py-3 rounded-xl font-bold">
+    class="bg-indigo-600 px-4 py-2 rounded font-bold">
     ▶ PLAY
   </button>
-</section>
+</div>
 
-<section class="flex gap-4 text-sm">
+<div class="flex gap-4 text-sm">
   <label>BPM
-    <input type="range" id="bpm" min="30" max="200" value="80">
+    <input type="range" id="bpm" min="40" max="200" value="80">
     <span id="bpmVal">80</span>
   </label>
-  <label>Afinação
-    <input type="range" id="hz" min="415" max="466" value="440">
-    <span id="hzVal">440</span>Hz
-  </label>
-</section>
+</div>
 
-<div id="score" class="bg-white rounded-xl p-3 text-black"></div>
+<div id="score" class="bg-white text-black rounded-xl p-3"></div>
 
 <script>
-/* ======================
-   SETUP
-====================== */
+/* ================= SETUP ================= */
+let audioCtx = null;
+let queue = [];
+
 const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
-  autoResize: true,
-  drawTitle: false
+  drawTitle:false,
+  autoResize:true
 });
 
-let queue = [];
-let audioCtx = null;
-
 const NOTAS = ['C','D','E','F','G','A','B'];
-const SOLFEJO = {C:'Dó',D:'Ré',E:'Mi',F:'Fá',G:'Sol',A:'Lá',B:'Si'};
 const REF = {C:-9,D:-7,E:-5,F:-4,G:-2,A:0,B:2};
+const SOLFEJO = {C:'Dó',D:'Ré',E:'Mi',F:'Fá',G:'Sol',A:'Lá',B:'Si'};
 
-/* ======================
-   LOAD MUSICXML
-====================== */
+/* ================= AUDIO TEST ================= */
+document.getElementById("testSound").onclick = async () => {
+  if (!audioCtx) audioCtx = new AudioContext();
+  await audioCtx.resume();
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = "sine";
+  osc.frequency.value = 440;
+
+  gain.gain.value = 0.4;
+
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.5);
+};
+
+/* ================= LOAD XML ================= */
 document.getElementById("fileInput").onchange = async e => {
   const file = e.target.files[0];
   if (!file) return;
 
   await osmd.load(await file.text());
   osmd.render();
-  extrairNotas();
+  extrair();
 };
 
-/* ======================
-   EXTRACT NOTES
-====================== */
-function extrairNotas() {
+/* ================= EXTRACT NOTES ================= */
+function extrair() {
   queue = [];
+  const sheet = osmd.GraphicSheet;
 
-  const sheet
+  sheet.MusicPages.forEach(p =>
+    p.MusicSystems.forEach(sys =>
+      sys.StaffLines.forEach(st =>
+        st.Measures.forEach(m =>
+          m.StaffEntries.forEach(se => {
+            const src = se.ModelStaffEntry;
+            const dur = src.Duration?.RealValue || 0;
+
+            if (!src.sourceNotes?.length) {
+              queue.push({tipo:'pausa', dur});
+              return;
+            }
+
+            const n = src.sourceNotes[0];
+            queue.push({
+              tipo:'nota',
+              letra: NOTAS[n.Pitch.fundamentalPitch],
+              oitava: n.Pitch.octave + 3,
+              acidente: n.Pitch.accidental || 0,
+              dur
+            });
+          })
+        )
+      )
+    )
+  );
+}
+
+/* ================= FREQ ================= */
+function freq(l,o,a) {
+  return 440 * Math.pow(2,(REF[l]+(o-4)*12+a)/12);
+}
+
+/* ================= PLAY NOTE ================= */
+async function tocar(n, tempo) {
+  if (n.tipo === 'pausa') {
+    return new Promise(r => setTimeout(r, tempo*1000));
+  }
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = "triangle";
+  osc.frequency.value = freq(n.letra,n.oitava,n.acidente);
+
+  gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime+0.05);
+  gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime+tempo);
+
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime+tempo);
+
+  speechSynthesis.speak(
+    new SpeechSynthesisUtterance(SOLFEJO
