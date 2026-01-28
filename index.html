@@ -1,60 +1,13 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <title>Vox Solfejo</title>
-</head>
-<body>
-  <h1>🎶 Vox Solfejo – Teste de Voz Musical</h1>
-
-  <textarea id="score" rows="4" cols="40">
-C4 D4 E4 F4 G4
-  </textarea>
-  <br><br>
-
-  <button onclick="play()">▶️ Cantar</button>
-
-  <script>
-    let audioCtx;
-
-    function initAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-    }
-
-    function noteToFreq(note) {
-      const notes = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
-      const pitch = note[0];
-      const octave = parseInt(note[1]);
-      const midi = (octave + 1) * 12 + notes[pitch];
-      return 440 * Math.pow(2, (midi - 69) / 12);
-    }
-
-    async function play() {
-      initAudio();
-      await audioCtx.resume();
-
-      const notes = document.getElementById("score").value.trim().split(" ");
-      let t = audioCtx.currentTime;
-
-      notes.forEach(n => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-
-        osc.type = "sawtooth";
-        osc.frequency.value = noteToFreq(n);
-
-        gain.gain.setValueAtTime(0.3, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start(t);
-        osc.stop(t + 0.5);
-
-        t += 0.6;
-      });
-    }
-  </script>
-</body>
-</html>
+<div>
+  <label class="control-label mb-1 block">Tonalidade</label>
+  <select id="keySelect"
+    class="w-full p-2 rounded-xl border border-slate-200 text-sm font-bold">
+    <option value="0">Dó Maior (C)</option>
+    <option value="2">Ré Maior (D)</option>
+    <option value="4">Mi Maior (E)</option>
+    <option value="5">Fá Maior (F)</option>
+    <option value="7">Sol Maior (G)</option>
+    <option value="9">Lá Maior (A)</option>
+    <option value="11">Si Maior (B)</option>
+  </select>
+</div>
