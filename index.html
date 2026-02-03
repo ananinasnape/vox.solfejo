@@ -1,248 +1,177 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <title>VoxSolfejo – Core Funcional</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<title>VoxSolfejo – FUNCIONAL</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- OSMD -->
-  <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.7/build/opensheetmusicdisplay.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.7/build/opensheetmusicdisplay.min.js"></script>
 
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #f1f5f9;
-      margin: 0;
-      padding: 16px;
-    }
-    h1 {
-      font-size: 1.2rem;
-      margin-bottom: 8px;
-    }
-    #controls {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
-    button, input {
-      padding: 10px;
-      font-size: 0.9rem;
-    }
-    button {
-      cursor: pointer;
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    #status {
-      font-size: 0.85rem;
-      margin-bottom: 8px;
-    }
-    #score {
-      background: white;
-      border-radius: 8px;
-      padding: 8px;
-      min-height: 300px;
-    }
-  </style>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+  padding: 16px;
+}
+button, input {
+  padding: 10px;
+  font-size: 14px;
+}
+button:disabled {
+  opacity: 0.5;
+}
+#score {
+  background: #fff;
+  padding: 8px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+#status {
+  margin-top: 10px;
+  font-size: 13px;
+}
+</style>
 </head>
 
 <body>
 
-<h1>🎼 VoxSolfejo (Core Funcional)</h1>
+<h3>🎼 VoxSolfejo (versão que funciona)</h3>
 
-<div id="controls">
-  <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl" />
-  <button id="playBtn" disabled>▶ Play</button>
-  <button id="stopBtn" disabled>⏹ Stop</button>
-</div>
+<input type="file" id="fileInput" accept=".musicxml,.xml,.mxl">
+<button id="playBtn" disabled>▶ Play</button>
+<button id="stopBtn" disabled>⏹ Stop</button>
 
-<div id="status">Carregue um MusicXML para começar.</div>
-
+<div id="status">Carregue um MusicXML.</div>
 <div id="score"></div>
 
 <script>
-/* =========================
-   CONFIGURAÇÃO
-========================= */
-
-const SOLFEJO = ["Do", "Re", "Mi", "Fa", "Sol", "La", "Si"];
-let osmd = null;
+const SOLFEJO = ["Do","Re","Mi","Fa","Sol","La","Si"];
+let osmd;
 let timeline = [];
-let isPlaying = false;
-let stopRequested = false;
-
-/* =========================
-   INICIALIZAÇÃO
-========================= */
+let playing = false;
+let stopFlag = false;
 
 osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
-  drawTitle: true,
   autoResize: true
 });
 
-/* =========================
-   UPLOAD E PARSE
-========================= */
+/* ================= UPLOAD ================= */
 
-document.getElementById("fileInput").addEventListener("change", async (e) => {
+document.getElementById("fileInput").addEventListener("change", async e => {
   const file = e.target.files[0];
   if (!file) return;
 
+  reset();
   setStatus("Carregando partitura...");
-  resetPlayer();
-
-  const text = await file.text();
 
   try {
+    const text = await file.text();
     await osmd.load(text);
     osmd.render();
-    buildTimeline();
+    extractNotes();
   } catch (err) {
     console.error(err);
-    setStatus("Erro ao carregar o MusicXML.");
+    setStatus("Erro ao carregar MusicXML.");
   }
 });
 
-/* =========================
-   CONSTRUÇÃO DA TIMELINE
-========================= */
+/* ================= EXTRAÇÃO REAL ================= */
 
-function buildTimeline() {
+function extractNotes() {
   timeline = [];
 
-  try {
-    const sheet = osmd.Sheet;
-    const instruments = sheet.Instruments;
+  const measures = osmd.GraphicSheet.MeasureList;
 
-    instruments.forEach(instr => {
-      instr.Staves.forEach(staff => {
-        staff.Voices.forEach(voice => {
-          voice.VoiceEntries.forEach(entry => {
+  measures.forEach(measure => {
+    measure.forEach(staffMeasure => {
+      staffMeasure.staffEntries.forEach(entry => {
+        const dur = entry.sourceStaffEntry?.Duration?.RealValue;
+        if (!dur || dur <= 0) return;
 
-            const duration = entry.Duration?.RealValue;
-            if (!duration || duration <= 0) return;
+        if (!entry.notes || entry.notes.length === 0) {
+          timeline.push({ type:"rest", dur });
+        } else {
+          entry.notes.forEach(n => {
+            const p = n.sourceNote?.Pitch;
+            if (!p) return;
 
-            if (entry.Notes.length === 0) {
-              timeline.push({ type: "rest", duration });
-            } else {
-              entry.Notes.forEach(note => {
-                if (!note.Pitch) return;
+            const solfejo = SOLFEJO[p.FundamentalNote];
+            if (!solfejo) return;
 
-                const step = note.Pitch.FundamentalNote;
-                const solfejo = SOLFEJO[step];
-
-                if (!solfejo) return;
-
-                timeline.push({
-                  type: "note",
-                  text: solfejo,
-                  duration
-                });
-              });
-            }
+            timeline.push({
+              type: "note",
+              text: solfejo,
+              dur
+            });
           });
-        });
+        }
       });
     });
+  });
 
-    if (timeline.length === 0) {
-      setStatus("Nenhuma nota válida encontrada.");
-      return;
-    }
-
-    validateTimeline();
-    enablePlay();
-
-  } catch (e) {
-    console.error(e);
-    setStatus("Erro ao processar a partitura.");
+  if (timeline.length === 0) {
+    setStatus("Nenhuma nota válida encontrada.");
+    return;
   }
+
+  setStatus(`Partitura pronta (${timeline.length} eventos).`);
+  document.getElementById("playBtn").disabled = false;
 }
 
-/* =========================
-   VALIDAÇÃO MUSICAL
-========================= */
+/* ================= PLAYER ================= */
 
-function validateTimeline() {
-  for (let i = 0; i < timeline.length; i++) {
-    const ev = timeline[i];
-    if (ev.type === "note" && !ev.text) {
-      throw new Error("Nota inválida.");
-    }
-    if (ev.duration <= 0) {
-      throw new Error("Duração inválida.");
-    }
-  }
-  setStatus(`Partitura validada. ${timeline.length} eventos prontos.`);
-}
+document.getElementById("playBtn").onclick = async () => {
+  if (playing) return;
 
-/* =========================
-   PLAYER
-========================= */
-
-document.getElementById("playBtn").addEventListener("click", async () => {
-  if (isPlaying || timeline.length === 0) return;
-
-  // destrava áudio no Chrome
+  // 🔑 destrava áudio no Chrome
+  const unlock = new SpeechSynthesisUtterance(" ");
+  speechSynthesis.speak(unlock);
   speechSynthesis.cancel();
-  await speechSynthesis.getVoices();
 
-  isPlaying = true;
-  stopRequested = false;
-  setStatus("Tocando solfejo...");
+  playing = true;
+  stopFlag = false;
   document.getElementById("stopBtn").disabled = false;
+  setStatus("Solfejando...");
 
   const bpm = 60;
 
   for (const ev of timeline) {
-    if (stopRequested) break;
+    if (stopFlag) break;
 
-    const ms = ev.duration * (60000 / bpm) * 4;
+    const ms = ev.dur * (60000 / bpm) * 4;
 
     if (ev.type === "note") {
       const u = new SpeechSynthesisUtterance(ev.text);
       u.lang = "pt-BR";
-      u.rate = 1;
       speechSynthesis.speak(u);
     }
 
     await wait(ms);
   }
 
-  stopPlayback();
-});
+  stop();
+};
 
-document.getElementById("stopBtn").addEventListener("click", () => {
-  stopPlayback();
-});
+document.getElementById("stopBtn").onclick = stop;
 
-/* =========================
-   UTILIDADES
-========================= */
+/* ================= UTILS ================= */
 
 function wait(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-function stopPlayback() {
-  stopRequested = true;
-  isPlaying = false;
+function stop() {
+  stopFlag = true;
+  playing = false;
   speechSynthesis.cancel();
   document.getElementById("stopBtn").disabled = true;
   setStatus("Parado.");
 }
 
-function resetPlayer() {
-  stopPlayback();
+function reset() {
+  stop();
   timeline = [];
   document.getElementById("playBtn").disabled = true;
-}
-
-function enablePlay() {
-  document.getElementById("playBtn").disabled = false;
 }
 
 function setStatus(msg) {
