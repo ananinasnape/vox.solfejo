@@ -2,173 +2,234 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Vox Solfejo – Sincronizado</title>
-
-<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
+<title>VoxSolfejo</title>
 
 <style>
 body {
-  font-family: Arial, sans-serif;
-  background: #020617;
+  font-family: system-ui, sans-serif;
+  background: #0f172a;
   color: #e5e7eb;
   padding: 20px;
 }
+
+h1 {
+  margin-bottom: 10px;
+}
+
 .controls {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 15px;
 }
-#score {
-  background: white;
-  margin-top: 10px;
-  border-radius: 6px;
-}
-#log {
-  background: #020617;
-  margin-top: 10px;
+
+#fileInput {
   padding: 10px;
-  border-radius: 6px;
-  font-family: monospace;
-  max-height: 240px;
-  overflow-y: auto;
+  border: 2px dashed #38bdf8;
+  border-radius: 8px;
+  background: #020617;
+  color: #e5e7eb;
+  cursor: pointer;
 }
-button { padding: 6px 14px; }
+
+button {
+  font-size: 20px;
+  padding: 12px 26px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+}
+
+#playBtn {
+  background: #16a34a;
+  color: white;
+}
+
+#stopBtn {
+  background: #f87171;
+  color: #020617;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+label {
+  font-size: 14px;
+}
+
+input[type="number"] {
+  width: 80px;
+  padding: 6px;
+  border-radius: 6px;
+  border: none;
+}
+
+#log {
+  margin-top: 15px;
+  font-family: monospace;
+  font-size: 14px;
+  white-space: pre-line;
+}
 </style>
 </head>
 
 <body>
 
-<h2>🎶 Vox Solfejo – Voz no Tempo Musical</h2>
+<h1>🎶 VoxSolfejo</h1>
 
 <div class="controls">
-  <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl">
+  <input type="file" id="fileInput" accept=".xml,.musicxml">
+  <button id="playBtn" disabled>▶ PLAY</button>
+  <button id="stopBtn" disabled>⏹ STOP</button>
 
-  <label>BPM:
+  <label>BPM
     <input type="number" id="bpmInput" value="80">
   </label>
 
-  <label>A4:
-    <input type="number" id="hzInput" value="440">
+  <label>A4 (Hz)
+    <input type="number" id="a4Input" value="440">
   </label>
-
-  <button id="playBtn" disabled>▶ Play</button>
-  <button id="stopBtn" disabled>⏹ Stop</button>
 </div>
 
-<div id="score"></div>
 <div id="log"></div>
 
 <script>
-const SOLFEJO = {
-  C:{nome:"Dó",vogal:"ó"},
-  D:{nome:"Ré",vogal:"é"},
-  E:{nome:"Mi",vogal:"i"},
-  F:{nome:"Fá",vogal:"á"},
-  G:{nome:"Sol",vogal:"ó"},
-  A:{nome:"Lá",vogal:"á"},
-  B:{nome:"Si",vogal:"i"}
+let notesTimeline = [];
+let audioCtx;
+let stopFlag = false;
+
+const solfejo = {
+  C: "Dó",
+  D: "Ré",
+  E: "Mi",
+  F: "Fá",
+  G: "Sol",
+  A: "Lá",
+  B: "Si"
 };
 
-const SEMI = {C:-9,D:-7,E:-5,F:-4,G:-2,A:0,B:2};
-
-let osmd, events=[], divisions=4, idx=0;
-let ctx=new (window.AudioContext||window.webkitAudioContext)();
-let playing=false, timer=null;
-
-fileInput.onchange=e=>{
-  const r=new FileReader();
-  r.onload=()=>loadScore(r.result);
-  r.readAsText(e.target.files[0]);
-};
-
-playBtn.onclick=play;
-stopBtn.onclick=stop;
-
-async function loadScore(xml){
-  osmd ||= new opensheetmusicdisplay.OpenSheetMusicDisplay("score");
-  await osmd.load(xml);
-  osmd.render();
-  parseXML(xml);
-  playBtn.disabled = stopBtn.disabled = false;
+function stepToMidi(step, octave, alter = 0) {
+  const base = {C:0, D:2, E:4, F:5, G:7, A:9, B:11}[step];
+  return 12 * (octave + 1) + base + alter;
 }
 
-function parseXML(txt){
-  events=[]; idx=0; log.textContent="";
-  const xml=new DOMParser().parseFromString(txt,"application/xml");
-  divisions=parseInt(xml.querySelector("divisions")?.textContent||4);
+function midiToFreq(midi, a4) {
+  return a4 * Math.pow(2, (midi - 69) / 12);
+}
 
-  xml.querySelectorAll("note").forEach(n=>{
-    const dur=parseInt(n.querySelector("duration")?.textContent||0);
-    if(n.querySelector("rest")){
-      events.push({rest:true,dur});
+function parseMusicXML(xmlText) {
+  notesTimeline = [];
+  const xml = new DOMParser().parseFromString(xmlText, "application/xml");
+
+  const divisionsNode = xml.querySelector("divisions");
+  const divisions = divisionsNode ? parseInt(divisionsNode.textContent) : 4;
+
+  let bpm = parseInt(document.getElementById("bpmInput").value);
+  const quarterMs = 60000 / bpm;
+
+  xml.querySelectorAll("note").forEach(note => {
+    const durationDiv = parseInt(note.querySelector("duration")?.textContent || 0);
+    const durationMs = (durationDiv / divisions) * quarterMs;
+
+    if (note.querySelector("rest")) {
+      notesTimeline.push({ rest: true, duration: durationMs });
       return;
     }
-    events.push({
-      step:n.querySelector("step").textContent,
-      oct:parseInt(n.querySelector("octave").textContent),
-      alter:parseInt(n.querySelector("alter")?.textContent||0),
-      dur
+
+    const step = note.querySelector("step")?.textContent;
+    const octave = parseInt(note.querySelector("octave")?.textContent);
+    const alter = parseInt(note.querySelector("alter")?.textContent || 0);
+
+    if (!step || isNaN(octave)) return;
+
+    notesTimeline.push({
+      rest: false,
+      step,
+      octave,
+      alter,
+      duration: durationMs
     });
   });
+
+  return notesTimeline.length > 0;
 }
 
-function freq(step,oct,alter){
-  const a4=+hzInput.value;
-  const s=SEMI[step]+alter+(oct-4)*12;
-  return a4*Math.pow(2,s/12);
-}
+async function playTimeline() {
+  stopFlag = false;
+  audioCtx = new AudioContext();
+  const a4 = parseFloat(document.getElementById("a4Input").value);
+  let t = audioCtx.currentTime;
 
-function solfejoFalado(step,durMs){
-  const base=SOLFEJO[step];
-  const reps=Math.max(1,Math.round(durMs/120));
-  return base.nome[0]+base.nome.slice(1)+base.vogal.repeat(reps);
-}
+  document.getElementById("log").textContent = "";
 
-function play(){
-  if(playing) return;
-  playing=true;
-  ctx.resume();
-  next();
-}
+  for (const n of notesTimeline) {
+    if (stopFlag) break;
 
-function stop(){
-  playing=false;
-  clearTimeout(timer);
-  speechSynthesis.cancel();
-  idx=0;
-}
+    if (n.rest) {
+      await sleep(n.duration);
+      continue;
+    }
 
-function next(){
-  if(!playing||idx>=events.length){ playing=false; return; }
+    const midi = stepToMidi(n.step, n.octave, n.alter);
+    const freq = midiToFreq(midi, a4);
 
-  const e=events[idx++];
-  const bpm=+bpmInput.value;
-  const ms=(60/bpm)*(e.dur/divisions)*1000;
+    // MIDI de fundo
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    gain.gain.value = 0.05;
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + n.duration / 1000);
 
-  if(!e.rest){
-    const f=freq(e.step,e.oct,e.alter);
+    // Voz falada sincronizada
+    const utter = new SpeechSynthesisUtterance(solfejo[n.step]);
+    utter.rate = 1;
+    utter.pitch = freq / 440;
+    utter.volume = 1;
+    speechSynthesis.speak(utter);
 
-    /* MIDI fundo */
-    const osc=ctx.createOscillator();
-    const g=ctx.createGain();
-    g.gain.value=0.07;
-    osc.frequency.value=f;
-    osc.connect(g).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime+ms/1000);
+    document.getElementById("log").textContent +=
+      `▶ ${solfejo[n.step]}${n.octave} – ${freq.toFixed(2)} Hz – ${Math.round(n.duration)} ms\n`;
 
-    /* VOZ COM DURAÇÃO MUSICAL */
-    const texto=solfejoFalado(e.step,ms);
-    const u=new SpeechSynthesisUtterance(texto);
-    u.rate=1;
-    speechSynthesis.speak(u);
-
-    log.textContent+=`▶ ${texto} (${Math.round(ms)} ms)\n`;
-    log.scrollTop=log.scrollHeight;
+    await sleep(n.duration);
   }
-
-  timer=setTimeout(next,ms);
 }
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+document.getElementById("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const ok = parseMusicXML(reader.result);
+    document.getElementById("playBtn").disabled = !ok;
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById("playBtn").onclick = () => {
+  document.getElementById("playBtn").disabled = true;
+  document.getElementById("stopBtn").disabled = false;
+  playTimeline().finally(() => {
+    document.getElementById("playBtn").disabled = false;
+    document.getElementById("stopBtn").disabled = true;
+  });
+};
+
+document.getElementById("stopBtn").onclick = () => {
+  stopFlag = true;
+  speechSynthesis.cancel();
+  audioCtx?.close();
+};
 </script>
+
 </body>
 </html>
