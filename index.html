@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Vox Solfejo</title>
+<title>Vox Solfejo Maestro</title>
 
 <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
 
@@ -14,186 +14,177 @@ body {
   padding: 20px;
 }
 
-h1 { margin-bottom: 10px; }
+h1 { margin-bottom: 8px; }
 
 .controls {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
-label {
-  font-size: 14px;
-}
+button { padding: 6px 14px; }
+button:disabled { opacity: .4; }
 
-input[type="number"] {
-  width: 80px;
-}
+label { font-size: 14px; }
 
-button {
-  padding: 8px 16px;
-  font-size: 15px;
-}
+#status { margin: 8px 0; }
 
-button:disabled {
-  opacity: 0.4;
-}
-
-#status {
+#score {
+  background: white;
+  border-radius: 6px;
   margin-top: 10px;
 }
 
-#score {
-  margin-top: 20px;
-  background: white;
+#log {
+  background: #020617;
   border-radius: 6px;
+  padding: 10px;
+  margin-top: 10px;
+  font-family: monospace;
+  font-size: 13px;
+  max-height: 220px;
+  overflow-y: auto;
 }
 </style>
 </head>
 
 <body>
 
-<h1>🎶 Vox Solfejo</h1>
+<h1>🎶 Vox Solfejo Maestro</h1>
 
 <div class="controls">
   <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl">
 
-  <label>
-    BPM:
+  <label>BPM:
     <input type="number" id="bpmInput" value="80" min="30" max="240">
   </label>
 
-  <label>
-    A4 (Hz):
+  <label>A4 (Hz):
     <input type="number" id="hzInput" value="440" min="430" max="450">
   </label>
 
   <button id="playBtn" disabled>▶ Play</button>
+  <button id="pauseBtn" disabled>⏸</button>
+  <button id="stopBtn" disabled>⏹</button>
 </div>
 
 <div id="status">Carregue um MusicXML.</div>
-
 <div id="score"></div>
+<div id="log"></div>
 
 <script>
 const fileInput = document.getElementById("fileInput");
-const playBtn   = document.getElementById("playBtn");
-const statusEl  = document.getElementById("status");
-const bpmInput  = document.getElementById("bpmInput");
-const hzInput   = document.getElementById("hzInput");
+const playBtn  = document.getElementById("playBtn");
+const pauseBtn = document.getElementById("pauseBtn");
+const stopBtn  = document.getElementById("stopBtn");
+const statusEl = document.getElementById("status");
+const bpmInput = document.getElementById("bpmInput");
+const hzInput  = document.getElementById("hzInput");
+const logEl    = document.getElementById("log");
 
-let osmd;
-let events = [];
-let divisions = 4;
+let osmd, events=[], divisions=4;
+let idx=0, playing=false, paused=false, timer=null;
+let audioCtx = new (window.AudioContext||window.webkitAudioContext)();
 
-const solfejo = {
-  C: "Do", D: "Re", E: "Mi",
-  F: "Fa", G: "Sol", A: "La", B: "Si"
-};
+const SOLFEJO = {C:"Dó",D:"Ré",E:"Mi",F:"Fá",G:"Sol",A:"Lá",B:"Si"};
+const SEMITONS = {C:-9,D:-7,E:-5,F:-4,G:-2,A:0,B:2};
 
-fileInput.addEventListener("change", handleFile);
-playBtn.addEventListener("click", playSequence);
+fileInput.onchange = loadFile;
+playBtn.onclick = play;
+pauseBtn.onclick = pause;
+stopBtn.onclick = stop;
 
-function handleFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = () => loadScore(reader.result);
-  reader.readAsText(file);
+function loadFile(e){
+  const f=e.target.files[0];
+  if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>loadScore(r.result);
+  r.readAsText(f);
 }
 
-async function loadScore(xmlText) {
-  playBtn.disabled = true;
-  statusEl.textContent = "Carregando…";
-
-  // Renderização da partitura
-  if (!osmd) {
-    osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
-      drawTitle: true
-    });
-  }
-
-  await osmd.load(xmlText);
+async function loadScore(xml){
+  playBtn.disabled=true;
+  if(!osmd) osmd=new opensheetmusicdisplay.OpenSheetMusicDisplay("score");
+  await osmd.load(xml);
   osmd.render();
-
-  parseXML(xmlText);
-
-  if (events.length > 0) {
-    statusEl.textContent = "Pronto para tocar.";
-    playBtn.disabled = false;
-  } else {
-    statusEl.textContent = "Nenhuma nota válida.";
+  parseXML(xml);
+  if(events.length){
+    statusEl.textContent="Pronto.";
+    playBtn.disabled=pauseBtn.disabled=stopBtn.disabled=false;
   }
 }
 
-function parseXML(text) {
-  events = [];
+function parseXML(txt){
+  events=[]; idx=0; logEl.textContent="";
+  const xml=new DOMParser().parseFromString(txt,"application/xml");
+  divisions=parseInt(xml.querySelector("divisions")?.textContent||4);
 
-  const xml = new DOMParser().parseFromString(text, "application/xml");
-
-  const divNode = xml.querySelector("divisions");
-  if (divNode) divisions = parseInt(divNode.textContent, 10);
-
-  const notes = xml.querySelectorAll("note");
-
-  notes.forEach(note => {
-    const durNode = note.querySelector("duration");
-    if (!durNode) return;
-
-    const duration = parseInt(durNode.textContent, 10);
-
-    if (note.querySelector("rest")) {
-      events.push({ type: "rest", duration });
+  xml.querySelectorAll("note").forEach(n=>{
+    const dur=parseInt(n.querySelector("duration")?.textContent||0);
+    if(n.querySelector("rest")){
+      events.push({type:"rest",dur});
       return;
     }
-
-    const pitch = note.querySelector("pitch");
-    if (!pitch) return;
-
-    const step = pitch.querySelector("step")?.textContent;
-    if (!step) return;
-
-    events.push({
-      type: "note",
-      name: solfejo[step],
-      duration
-    });
+    const step=n.querySelector("step")?.textContent;
+    const oct=parseInt(n.querySelector("octave")?.textContent);
+    const alter=parseInt(n.querySelector("alter")?.textContent||0);
+    if(step) events.push({type:"note",step,oct,alter,dur});
   });
 }
 
-function playSequence() {
-  playBtn.disabled = true;
-  statusEl.textContent = "Tocando…";
+function freq(step,oct,alter){
+  const a4=parseFloat(hzInput.value);
+  const sem=SEMITONS[step]+alter+(oct-4)*12;
+  return +(a4*Math.pow(2,sem/12)).toFixed(2);
+}
 
-  const bpm = parseInt(bpmInput.value, 10);
-  const a4hz = parseInt(hzInput.value, 10); // já preparado
-
-  let i = 0;
-
-  function next() {
-    if (i >= events.length) {
-      statusEl.textContent = "Fim.";
-      playBtn.disabled = false;
-      return;
-    }
-
-    const ev = events[i++];
-    const seconds = (60 / bpm) * (ev.duration / divisions);
-
-    if (ev.type === "note") {
-      const u = new SpeechSynthesisUtterance(ev.name);
-      u.lang = "pt-BR";
-      speechSynthesis.speak(u);
-    }
-
-    setTimeout(next, seconds * 1000);
-  }
-
+function play(){
+  if(playing) return;
+  playing=true; paused=false;
+  audioCtx.resume();
   next();
 }
-</script>
 
+function pause(){
+  paused=true; playing=false;
+  clearTimeout(timer);
+  speechSynthesis.cancel();
+}
+
+function stop(){
+  playing=false; paused=false; idx=0;
+  clearTimeout(timer);
+  speechSynthesis.cancel();
+}
+
+function next(){
+  if(!playing||paused||idx>=events.length){
+    playing=false; return;
+  }
+  const ev=events[idx++];
+  const bpm=parseFloat(bpmInput.value);
+  const ms=(60/bpm)*(ev.dur/divisions)*1000;
+
+  if(ev.type==="note"){
+    const f=freq(ev.step,ev.oct,ev.alter);
+    const osc=audioCtx.createOscillator();
+    const g=audioCtx.createGain();
+    osc.frequency.value=f;
+    g.gain.value=0.15;
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime+ms/1000);
+
+    const nome=SOLFEJO[ev.step]+(ev.alter===1?"♯":ev.alter===-1?"♭":"")+ev.oct;
+    logEl.textContent+=`▶ ${nome} - ${f} Hz por ${Math.round(ms)} ms\n`;
+    logEl.scrollTop=logEl.scrollHeight;
+
+    speechSynthesis.speak(new SpeechSynthesisUtterance(SOLFEJO[ev.step]));
+  }
+
+  timer=setTimeout(next,ms);
+}
+</script>
 </body>
 </html>
