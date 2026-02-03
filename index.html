@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<title>Vox Solfejo – Funcional</title>
+<meta charset="UTF-8">
+<title>Vox Solfejo</title>
+
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
 
 <style>
 body {
@@ -15,33 +17,37 @@ body {
 h1 { margin-bottom: 10px; }
 
 .controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 15px;
 }
 
+label {
+  font-size: 14px;
+}
+
+input[type="number"] {
+  width: 80px;
+}
+
 button {
-  padding: 10px 20px;
-  font-size: 16px;
-  cursor: pointer;
+  padding: 8px 16px;
+  font-size: 15px;
 }
 
 button:disabled {
   opacity: 0.4;
-  cursor: not-allowed;
 }
 
 #status {
   margin-top: 10px;
-  font-size: 14px;
 }
 
-#notes {
+#score {
   margin-top: 20px;
-  background: #020617;
-  padding: 10px;
+  background: white;
   border-radius: 6px;
-  max-height: 300px;
-  overflow-y: auto;
-  font-family: monospace;
 }
 </style>
 </head>
@@ -51,24 +57,36 @@ button:disabled {
 <h1>🎶 Vox Solfejo</h1>
 
 <div class="controls">
-  <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl" />
+  <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl">
+
+  <label>
+    BPM:
+    <input type="number" id="bpmInput" value="80" min="30" max="240">
+  </label>
+
+  <label>
+    A4 (Hz):
+    <input type="number" id="hzInput" value="440" min="430" max="450">
+  </label>
+
   <button id="playBtn" disabled>▶ Play</button>
 </div>
 
 <div id="status">Carregue um MusicXML.</div>
-<div id="notes"></div>
+
+<div id="score"></div>
 
 <script>
 const fileInput = document.getElementById("fileInput");
 const playBtn   = document.getElementById("playBtn");
 const statusEl  = document.getElementById("status");
-const notesEl   = document.getElementById("notes");
+const bpmInput  = document.getElementById("bpmInput");
+const hzInput   = document.getElementById("hzInput");
 
+let osmd;
 let events = [];
-let bpm = 80;
 let divisions = 4;
 
-// Solfejo fixo (pedido seu)
 const solfejo = {
   C: "Do", D: "Re", E: "Mi",
   F: "Fa", G: "Sol", A: "La", B: "Si"
@@ -82,48 +100,52 @@ function handleFile(e) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = () => parseXML(reader.result);
+  reader.onload = () => loadScore(reader.result);
   reader.readAsText(file);
+}
+
+async function loadScore(xmlText) {
+  playBtn.disabled = true;
+  statusEl.textContent = "Carregando…";
+
+  // Renderização da partitura
+  if (!osmd) {
+    osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
+      drawTitle: true
+    });
+  }
+
+  await osmd.load(xmlText);
+  osmd.render();
+
+  parseXML(xmlText);
+
+  if (events.length > 0) {
+    statusEl.textContent = "Pronto para tocar.";
+    playBtn.disabled = false;
+  } else {
+    statusEl.textContent = "Nenhuma nota válida.";
+  }
 }
 
 function parseXML(text) {
   events = [];
-  notesEl.innerHTML = "";
-  playBtn.disabled = true;
 
-  let xml;
-  try {
-    xml = new DOMParser().parseFromString(text, "application/xml");
-  } catch {
-    statusEl.textContent = "Erro ao ler XML.";
-    return;
-  }
+  const xml = new DOMParser().parseFromString(text, "application/xml");
 
-  // BPM
-  const tempoNode = xml.querySelector("per-minute");
-  if (tempoNode) bpm = parseInt(tempoNode.textContent, 10);
-
-  // Divisions
   const divNode = xml.querySelector("divisions");
   if (divNode) divisions = parseInt(divNode.textContent, 10);
 
-  const noteNodes = xml.querySelectorAll("note");
+  const notes = xml.querySelectorAll("note");
 
-  if (!noteNodes.length) {
-    statusEl.textContent = "XML sem notas.";
-    return;
-  }
+  notes.forEach(note => {
+    const durNode = note.querySelector("duration");
+    if (!durNode) return;
 
-  noteNodes.forEach(note => {
-    const durationNode = note.querySelector("duration");
-    if (!durationNode) return;
+    const duration = parseInt(durNode.textContent, 10);
 
-    const duration = parseInt(durationNode.textContent, 10);
-
-    // Pausa
     if (note.querySelector("rest")) {
       events.push({ type: "rest", duration });
-      notesEl.innerHTML += "⏸ pausa<br>";
       return;
     }
 
@@ -133,41 +155,37 @@ function parseXML(text) {
     const step = pitch.querySelector("step")?.textContent;
     if (!step) return;
 
-    const name = solfejo[step] || step;
-
-    events.push({ type: "note", name, duration });
-    notesEl.innerHTML += `🎵 ${name}<br>`;
+    events.push({
+      type: "note",
+      name: solfejo[step],
+      duration
+    });
   });
-
-  if (events.length === 0) {
-    statusEl.textContent = "Nenhuma nota utilizável.";
-    return;
-  }
-
-  statusEl.textContent = `Arquivo válido. BPM=${bpm}`;
-  playBtn.disabled = false;
 }
 
 function playSequence() {
   playBtn.disabled = true;
   statusEl.textContent = "Tocando…";
 
-  let index = 0;
+  const bpm = parseInt(bpmInput.value, 10);
+  const a4hz = parseInt(hzInput.value, 10); // já preparado
+
+  let i = 0;
 
   function next() {
-    if (index >= events.length) {
+    if (i >= events.length) {
       statusEl.textContent = "Fim.";
       playBtn.disabled = false;
       return;
     }
 
-    const ev = events[index++];
+    const ev = events[i++];
     const seconds = (60 / bpm) * (ev.duration / divisions);
 
     if (ev.type === "note") {
-      const utter = new SpeechSynthesisUtterance(ev.name);
-      utter.lang = "pt-BR";
-      speechSynthesis.speak(utter);
+      const u = new SpeechSynthesisUtterance(ev.name);
+      u.lang = "pt-BR";
+      speechSynthesis.speak(u);
     }
 
     setTimeout(next, seconds * 1000);
