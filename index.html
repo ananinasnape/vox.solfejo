@@ -1,308 +1,181 @@
-Um de seus códigos anteriores funcionava (mal, errado, mas funcionava); o atual não funciona. 
-Estou te enviando outro código que pode ajudar.  Junte tudo; Ajuste, TESTE, Me entregue FUNCIONANDO. Mostre o código também.
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Vox Solfejo – Funcional</title>
 
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+  padding: 20px;
+}
 
-<score-partwise version="3.1">
-<work>
-<work-title>Teste Completo de Solfejo</work-title>
-</work>
-<identification>
-<encoding>
-<software>VoxSolfejo</software>
-<encoding-date>2026-02-03</encoding-date>
-</encoding>
-</identification>
-<part-list>
-<score-part id="P1">
-<part-name>Voz</part-name>
-</score-part>
-</part-list>
-<part id="P1">
-<!--  Compasso 1: Escala ascendente em C maior  -->
-<measure number="1">
-<attributes>
-<divisions>4</divisions>
-<key>
-<fifths>0</fifths>
-</key>
-<time>
-<beats>4</beats>
-<beat-type>4</beat-type>
-</time>
-<clef>
-<sign>G</sign>
-<line>2</line>
-</clef>
-</attributes>
-<direction placement="above">
-<direction-type>
-<metronome parentheses="no">
-<beat-unit>quarter</beat-unit>
-<per-minute>80</per-minute>
-</metronome>
-</direction-type>
-</direction>
-<!--  Dó central (C4)  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Ré (D4)  -->
-<note>
-<pitch>
-<step>D</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Mi (E4)  -->
-<note>
-<pitch>
-<step>E</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Fá (F4)  -->
-<note>
-<pitch>
-<step>F</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-</measure>
-<!--  Compasso 2: Continuação da escala  -->
-<measure number="2">
-<!--  Sol (G4)  -->
-<note>
-<pitch>
-<step>G</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Lá (A4) - 440Hz  -->
-<note>
-<pitch>
-<step>A</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Si (B4)  -->
-<note>
-<pitch>
-<step>B</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Dó agudo (C5)  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>5</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-</measure>
-<!--  Compasso 3: Notas com durações variadas  -->
-<measure number="3">
-<!--  Dó - mínima (2 tempos)  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>4</octave>
-</pitch>
-<duration>8</duration>
-<type>half</type>
-</note>
-<!--  Mi - semínima  -->
-<note>
-<pitch>
-<step>E</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Sol - semínima  -->
-<note>
-<pitch>
-<step>G</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-</measure>
-<!--  Compasso 4: Acordes quebrados  -->
-<measure number="4">
-<!--  Dó  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Mi  -->
-<note>
-<pitch>
-<step>E</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Sol  -->
-<note>
-<pitch>
-<step>G</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Dó agudo - semínima  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>5</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-</measure>
-<!--  Compasso 5: Pausa e notas  -->
-<measure number="5">
-<!--  Pausa de semínima  -->
-<note>
-<rest/>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Ré  -->
-<note>
-<pitch>
-<step>D</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Pausa de semínima  -->
-<note>
-<rest/>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Fá  -->
-<note>
-<pitch>
-<step>F</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-</measure>
-<!--  Compasso 6: Oitavas diferentes  -->
-<measure number="6">
-<!--  Dó grave (C3)  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>3</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Dó central (C4)  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Dó agudo (C5)  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>5</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Dó superagudo (C6)  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>6</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-</measure>
-<!--  Compasso 7: Notas longas  -->
-<measure number="7">
-<!--  Lá - semibreve (4 tempos)  -->
-<note>
-<pitch>
-<step>A</step>
-<octave>4</octave>
-</pitch>
-<duration>16</duration>
-<type>whole</type>
-</note>
-</measure>
-<!--  Compasso 8: Descida cromática parcial em C  -->
-<measure number="8">
-<!--  Mi  -->
-<note>
-<pitch>
-<step>E</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Ré  -->
-<note>
-<pitch>
-<step>D</step>
-<octave>4</octave>
-</pitch>
-<duration>4</duration>
-<type>quarter</type>
-</note>
-<!--  Dó  -->
-<note>
-<pitch>
-<step>C</step>
-<octave>4</octave>
-</pitch>
-<duration>8</duration>
-<type>half</type>
-</note>
-<barline location="right">
-<bar-style>light-heavy</bar-style>
-</barline>
-</measure>
-</part>
-</score-partwise>
+h1 { margin-bottom: 10px; }
+
+.controls {
+  margin-bottom: 15px;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#status {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+#notes {
+  margin-top: 20px;
+  background: #020617;
+  padding: 10px;
+  border-radius: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: monospace;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🎶 Vox Solfejo</h1>
+
+<div class="controls">
+  <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl" />
+  <button id="playBtn" disabled>▶ Play</button>
+</div>
+
+<div id="status">Carregue um MusicXML.</div>
+<div id="notes"></div>
+
+<script>
+const fileInput = document.getElementById("fileInput");
+const playBtn   = document.getElementById("playBtn");
+const statusEl  = document.getElementById("status");
+const notesEl   = document.getElementById("notes");
+
+let events = [];
+let bpm = 80;
+let divisions = 4;
+
+// Solfejo fixo (pedido seu)
+const solfejo = {
+  C: "Do", D: "Re", E: "Mi",
+  F: "Fa", G: "Sol", A: "La", B: "Si"
+};
+
+fileInput.addEventListener("change", handleFile);
+playBtn.addEventListener("click", playSequence);
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => parseXML(reader.result);
+  reader.readAsText(file);
+}
+
+function parseXML(text) {
+  events = [];
+  notesEl.innerHTML = "";
+  playBtn.disabled = true;
+
+  let xml;
+  try {
+    xml = new DOMParser().parseFromString(text, "application/xml");
+  } catch {
+    statusEl.textContent = "Erro ao ler XML.";
+    return;
+  }
+
+  // BPM
+  const tempoNode = xml.querySelector("per-minute");
+  if (tempoNode) bpm = parseInt(tempoNode.textContent, 10);
+
+  // Divisions
+  const divNode = xml.querySelector("divisions");
+  if (divNode) divisions = parseInt(divNode.textContent, 10);
+
+  const noteNodes = xml.querySelectorAll("note");
+
+  if (!noteNodes.length) {
+    statusEl.textContent = "XML sem notas.";
+    return;
+  }
+
+  noteNodes.forEach(note => {
+    const durationNode = note.querySelector("duration");
+    if (!durationNode) return;
+
+    const duration = parseInt(durationNode.textContent, 10);
+
+    // Pausa
+    if (note.querySelector("rest")) {
+      events.push({ type: "rest", duration });
+      notesEl.innerHTML += "⏸ pausa<br>";
+      return;
+    }
+
+    const pitch = note.querySelector("pitch");
+    if (!pitch) return;
+
+    const step = pitch.querySelector("step")?.textContent;
+    if (!step) return;
+
+    const name = solfejo[step] || step;
+
+    events.push({ type: "note", name, duration });
+    notesEl.innerHTML += `🎵 ${name}<br>`;
+  });
+
+  if (events.length === 0) {
+    statusEl.textContent = "Nenhuma nota utilizável.";
+    return;
+  }
+
+  statusEl.textContent = `Arquivo válido. BPM=${bpm}`;
+  playBtn.disabled = false;
+}
+
+function playSequence() {
+  playBtn.disabled = true;
+  statusEl.textContent = "Tocando…";
+
+  let index = 0;
+
+  function next() {
+    if (index >= events.length) {
+      statusEl.textContent = "Fim.";
+      playBtn.disabled = false;
+      return;
+    }
+
+    const ev = events[index++];
+    const seconds = (60 / bpm) * (ev.duration / divisions);
+
+    if (ev.type === "note") {
+      const utter = new SpeechSynthesisUtterance(ev.name);
+      utter.lang = "pt-BR";
+      speechSynthesis.speak(utter);
+    }
+
+    setTimeout(next, seconds * 1000);
+  }
+
+  next();
+}
+</script>
+
+</body>
+</html>
