@@ -1,183 +1,308 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-<meta charset="UTF-8">
-<title>VoxSolfejo – FUNCIONAL</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+Um de seus códigos anteriores funcionava (mal, errado, mas funcionava); o atual não funciona. 
+Estou te enviando outro código que pode ajudar.  Junte tudo; Ajuste, TESTE, Me entregue FUNCIONANDO. Mostre o código também.
 
-<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.7/build/opensheetmusicdisplay.min.js"></script>
 
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f1f5f9;
-  padding: 16px;
-}
-button, input {
-  padding: 10px;
-  font-size: 14px;
-}
-button:disabled {
-  opacity: 0.5;
-}
-#score {
-  background: #fff;
-  padding: 8px;
-  border-radius: 8px;
-  margin-top: 10px;
-}
-#status {
-  margin-top: 10px;
-  font-size: 13px;
-}
-</style>
-</head>
-
-<body>
-
-<h3>🎼 VoxSolfejo (versão que funciona)</h3>
-
-<input type="file" id="fileInput" accept=".musicxml,.xml,.mxl">
-<button id="playBtn" disabled>▶ Play</button>
-<button id="stopBtn" disabled>⏹ Stop</button>
-
-<div id="status">Carregue um MusicXML.</div>
-<div id="score"></div>
-
-<script>
-const SOLFEJO = ["Do","Re","Mi","Fa","Sol","La","Si"];
-let osmd;
-let timeline = [];
-let playing = false;
-let stopFlag = false;
-
-osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
-  autoResize: true
-});
-
-/* ================= UPLOAD ================= */
-
-document.getElementById("fileInput").addEventListener("change", async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  reset();
-  setStatus("Carregando partitura...");
-
-  try {
-    const text = await file.text();
-    await osmd.load(text);
-    osmd.render();
-    extractNotes();
-  } catch (err) {
-    console.error(err);
-    setStatus("Erro ao carregar MusicXML.");
-  }
-});
-
-/* ================= EXTRAÇÃO REAL ================= */
-
-function extractNotes() {
-  timeline = [];
-
-  const measures = osmd.GraphicSheet.MeasureList;
-
-  measures.forEach(measure => {
-    measure.forEach(staffMeasure => {
-      staffMeasure.staffEntries.forEach(entry => {
-        const dur = entry.sourceStaffEntry?.Duration?.RealValue;
-        if (!dur || dur <= 0) return;
-
-        if (!entry.notes || entry.notes.length === 0) {
-          timeline.push({ type:"rest", dur });
-        } else {
-          entry.notes.forEach(n => {
-            const p = n.sourceNote?.Pitch;
-            if (!p) return;
-
-            const solfejo = SOLFEJO[p.FundamentalNote];
-            if (!solfejo) return;
-
-            timeline.push({
-              type: "note",
-              text: solfejo,
-              dur
-            });
-          });
-        }
-      });
-    });
-  });
-
-  if (timeline.length === 0) {
-    setStatus("Nenhuma nota válida encontrada.");
-    return;
-  }
-
-  setStatus(`Partitura pronta (${timeline.length} eventos).`);
-  document.getElementById("playBtn").disabled = false;
-}
-
-/* ================= PLAYER ================= */
-
-document.getElementById("playBtn").onclick = async () => {
-  if (playing) return;
-
-  // 🔑 destrava áudio no Chrome
-  const unlock = new SpeechSynthesisUtterance(" ");
-  speechSynthesis.speak(unlock);
-  speechSynthesis.cancel();
-
-  playing = true;
-  stopFlag = false;
-  document.getElementById("stopBtn").disabled = false;
-  setStatus("Solfejando...");
-
-  const bpm = 60;
-
-  for (const ev of timeline) {
-    if (stopFlag) break;
-
-    const ms = ev.dur * (60000 / bpm) * 4;
-
-    if (ev.type === "note") {
-      const u = new SpeechSynthesisUtterance(ev.text);
-      u.lang = "pt-BR";
-      speechSynthesis.speak(u);
-    }
-
-    await wait(ms);
-  }
-
-  stop();
-};
-
-document.getElementById("stopBtn").onclick = stop;
-
-/* ================= UTILS ================= */
-
-function wait(ms) {
-  return new Promise(r => setTimeout(r, ms));
-}
-
-function stop() {
-  stopFlag = true;
-  playing = false;
-  speechSynthesis.cancel();
-  document.getElementById("stopBtn").disabled = true;
-  setStatus("Parado.");
-}
-
-function reset() {
-  stop();
-  timeline = [];
-  document.getElementById("playBtn").disabled = true;
-}
-
-function setStatus(msg) {
-  document.getElementById("status").innerText = msg;
-}
-</script>
-
-</body>
-</html>
+<score-partwise version="3.1">
+<work>
+<work-title>Teste Completo de Solfejo</work-title>
+</work>
+<identification>
+<encoding>
+<software>VoxSolfejo</software>
+<encoding-date>2026-02-03</encoding-date>
+</encoding>
+</identification>
+<part-list>
+<score-part id="P1">
+<part-name>Voz</part-name>
+</score-part>
+</part-list>
+<part id="P1">
+<!--  Compasso 1: Escala ascendente em C maior  -->
+<measure number="1">
+<attributes>
+<divisions>4</divisions>
+<key>
+<fifths>0</fifths>
+</key>
+<time>
+<beats>4</beats>
+<beat-type>4</beat-type>
+</time>
+<clef>
+<sign>G</sign>
+<line>2</line>
+</clef>
+</attributes>
+<direction placement="above">
+<direction-type>
+<metronome parentheses="no">
+<beat-unit>quarter</beat-unit>
+<per-minute>80</per-minute>
+</metronome>
+</direction-type>
+</direction>
+<!--  Dó central (C4)  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Ré (D4)  -->
+<note>
+<pitch>
+<step>D</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Mi (E4)  -->
+<note>
+<pitch>
+<step>E</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Fá (F4)  -->
+<note>
+<pitch>
+<step>F</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+</measure>
+<!--  Compasso 2: Continuação da escala  -->
+<measure number="2">
+<!--  Sol (G4)  -->
+<note>
+<pitch>
+<step>G</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Lá (A4) - 440Hz  -->
+<note>
+<pitch>
+<step>A</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Si (B4)  -->
+<note>
+<pitch>
+<step>B</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Dó agudo (C5)  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>5</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+</measure>
+<!--  Compasso 3: Notas com durações variadas  -->
+<measure number="3">
+<!--  Dó - mínima (2 tempos)  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>4</octave>
+</pitch>
+<duration>8</duration>
+<type>half</type>
+</note>
+<!--  Mi - semínima  -->
+<note>
+<pitch>
+<step>E</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Sol - semínima  -->
+<note>
+<pitch>
+<step>G</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+</measure>
+<!--  Compasso 4: Acordes quebrados  -->
+<measure number="4">
+<!--  Dó  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Mi  -->
+<note>
+<pitch>
+<step>E</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Sol  -->
+<note>
+<pitch>
+<step>G</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Dó agudo - semínima  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>5</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+</measure>
+<!--  Compasso 5: Pausa e notas  -->
+<measure number="5">
+<!--  Pausa de semínima  -->
+<note>
+<rest/>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Ré  -->
+<note>
+<pitch>
+<step>D</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Pausa de semínima  -->
+<note>
+<rest/>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Fá  -->
+<note>
+<pitch>
+<step>F</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+</measure>
+<!--  Compasso 6: Oitavas diferentes  -->
+<measure number="6">
+<!--  Dó grave (C3)  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>3</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Dó central (C4)  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Dó agudo (C5)  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>5</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Dó superagudo (C6)  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>6</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+</measure>
+<!--  Compasso 7: Notas longas  -->
+<measure number="7">
+<!--  Lá - semibreve (4 tempos)  -->
+<note>
+<pitch>
+<step>A</step>
+<octave>4</octave>
+</pitch>
+<duration>16</duration>
+<type>whole</type>
+</note>
+</measure>
+<!--  Compasso 8: Descida cromática parcial em C  -->
+<measure number="8">
+<!--  Mi  -->
+<note>
+<pitch>
+<step>E</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Ré  -->
+<note>
+<pitch>
+<step>D</step>
+<octave>4</octave>
+</pitch>
+<duration>4</duration>
+<type>quarter</type>
+</note>
+<!--  Dó  -->
+<note>
+<pitch>
+<step>C</step>
+<octave>4</octave>
+</pitch>
+<duration>8</duration>
+<type>half</type>
+</note>
+<barline location="right">
+<bar-style>light-heavy</bar-style>
+</barline>
+</measure>
+</part>
+</score-partwise>
