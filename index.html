@@ -1,59 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>VoxSolfejo</title>
+
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+  padding: 20px;
+}
+
+h1 {
+  margin-bottom: 10px;
+}
+
 .controls {
   display: flex;
   gap: 12px;
-  align-items: center;
   flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 15px;
 }
 
-/* INPUT DE ARQUIVO */
 #fileInput {
   padding: 10px;
-  background: #1e293b;
-  color: #e5e7eb;
-  border-radius: 8px;
   border: 2px dashed #38bdf8;
+  border-radius: 8px;
+  background: #020617;
+  color: #e5e7eb;
   cursor: pointer;
-  font-weight: bold;
 }
 
-/* PLAY */
+button {
+  font-size: 20px;
+  padding: 12px 26px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+}
+
 #playBtn {
-  font-size: 22px;
-  padding: 12px 28px;
   background: #16a34a;
   color: white;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  box-shadow: 0 0 10px rgba(22,163,74,0.5);
 }
 
-#playBtn:disabled {
-  opacity: 0.4;
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-/* STOP */
 #stopBtn {
-  font-size: 18px;
-  padding: 12px 24px;
   background: #f87171;
   color: #020617;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
 }
 
-#stopBtn:disabled {
+button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-/* BPM / A4 */
-.controls input[type="number"] {
+label {
+  font-size: 14px;
+}
+
+input[type="number"] {
+  width: 80px;
   padding: 6px;
   border-radius: 6px;
   border: none;
-  width: 80px;
 }
+
+#log {
+  margin-top: 15px;
+  font-family: monospace;
+  font-size: 14px;
+  white-space: pre-line;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🎶 VoxSolfejo</h1>
+
+<div class="controls">
+  <input type="file" id="fileInput" accept=".xml,.musicxml">
+  <button id="playBtn" disabled>▶ PLAY</button>
+  <button id="stopBtn" disabled>⏹ STOP</button>
+
+  <label>BPM
+    <input type="number" id="bpmInput" value="80">
+  </label>
+
+  <label>A4 (Hz)
+    <input type="number" id="a4Input" value="440">
+  </label>
+</div>
+
+<div id="log"></div>
+
+<script>
+let notesTimeline = [];
+let audioCtx;
+let stopFlag = false;
+
+const solfejo = {
+  C: "Dó",
+  D: "Ré",
+  E: "Mi",
+  F: "Fá",
+  G: "Sol",
+  A: "Lá",
+  B: "Si"
+};
+
+function stepToMidi(step, octave, alter = 0) {
+  const base = {C:0, D:2, E:4, F:5, G:7, A:9, B:11}[step];
+  return 12 * (octave + 1) + base + alter;
+}
+
+function midiToFreq(midi, a4) {
+  return a4 * Math.pow(2, (midi - 69) / 12);
+}
+
+function parseMusicXML(xmlText) {
+  notesTimeline = [];
+  const xml = new DOMParser().parseFromString(xmlText, "application/xml");
+
+  const divisionsNode = xml.querySelector("divisions");
+  const divisions = divisionsNode ? parseInt(divisionsNode.textContent) : 4;
+
+  let bpm = parseInt(document.getElementById("bpmInput").value);
+  const quarterMs = 60000 / bpm;
+
+  xml.querySelectorAll("note").forEach(note => {
+    const durationDiv = parseInt(note.querySelector("duration")?.textContent || 0);
+    const durationMs = (durationDiv / divisions) * quarterMs;
+
+    if (note.querySelector("rest")) {
+      notesTimeline.push({ rest: true, duration: durationMs });
+      return;
+    }
+
+    const step = note.querySelector("step")?.textContent;
+    const octave = parseInt(note.querySelector("octave")?.textContent);
+    const alter = parseInt(note.querySelector("alter")?.textContent || 0);
+
+    if (!step || isNaN(octave)) return;
+
+    notesTimeline.push({
+      rest: false,
+      step,
+      octave,
+      alter,
+      duration: durationMs
+    });
+  });
+
+  return notesTimeline.length > 0;
+}
+
+async function playTimeline() {
+  stopFlag = false;
+  audioCtx = new AudioContext();
+  const a4 = parseFloat(document.getElementById("a4Input").value);
+  let t = audioCtx.currentTime;
+
+  document.getElementById("log").textContent = "";
+
+  for (const n of notesTimeline) {
+    if (stopFlag) break;
+
+    if (n.rest) {
+      await sleep(n.duration);
+      continue;
+    }
+
+    const midi = stepToMidi(n.step, n.octave, n.alter);
+    const freq = midiToFreq(midi, a4);
+
+    // MIDI de fundo
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    gain.gain.value = 0.05;
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + n.duration / 1000);
+
+    // Voz falada sincronizada
+    const utter = new SpeechSynthesisUtterance(solfejo[n.step]);
+    utter.rate = 1;
+    utter.pitch = freq / 440;
+    utter.volume = 1;
+    speechSynthesis.speak(utter);
+
+    document.getElementById("log").textContent +=
+      `▶ ${solfejo[n.step]}${n.octave} – ${freq.toFixed(2)} Hz – ${Math.round(n.duration)} ms\n`;
+
+    await sleep(n.duration);
+  }
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+document.getElementById("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const ok = parseMusicXML(reader.result);
+    document.getElementById("playBtn").disabled = !ok;
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById("playBtn").onclick = () => {
+  document.getElementById("playBtn").disabled = true;
+  document.getElementById("stopBtn").disabled = false;
+  playTimeline().finally(() => {
+    document.getElementById("playBtn").disabled = false;
+    document.getElementById("stopBtn").disabled = true;
+  });
+};
+
+document.getElementById("stopBtn").onclick = () => {
+  stopFlag = true;
+  speechSynthesis.cancel();
+  audioCtx?.close();
+};
+</script>
+
+</body>
+</html>
