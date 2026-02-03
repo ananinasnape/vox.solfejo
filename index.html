@@ -1,158 +1,59 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>Vox Solfejo Maestro</title>
-
-<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
-
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #0f172a;
-  color: #e5e7eb;
-  padding: 20px;
-}
 .controls {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  align-items: center;
   flex-wrap: wrap;
 }
-#score {
-  background: white;
-  margin-top: 10px;
-  border-radius: 6px;
-}
-#log {
-  background: #020617;
-  margin-top: 10px;
+
+/* INPUT DE ARQUIVO */
+#fileInput {
   padding: 10px;
+  background: #1e293b;
+  color: #e5e7eb;
+  border-radius: 8px;
+  border: 2px dashed #38bdf8;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* PLAY */
+#playBtn {
+  font-size: 22px;
+  padding: 12px 28px;
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(22,163,74,0.5);
+}
+
+#playBtn:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* STOP */
+#stopBtn {
+  font-size: 18px;
+  padding: 12px 24px;
+  background: #f87171;
+  color: #020617;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+#stopBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* BPM / A4 */
+.controls input[type="number"] {
+  padding: 6px;
   border-radius: 6px;
-  font-family: monospace;
-  max-height: 220px;
-  overflow-y: auto;
+  border: none;
+  width: 80px;
 }
-button { padding: 6px 14px; }
-</style>
-</head>
-
-<body>
-
-<h2>🎶 Vox Solfejo Maestro</h2>
-
-<div class="controls">
-  <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl">
-
-  <label>BPM:
-    <input type="number" id="bpmInput" value="80">
-  </label>
-
-  <label>A4:
-    <input type="number" id="hzInput" value="440">
-  </label>
-
-  <button id="playBtn" disabled>▶ Play</button>
-  <button id="stopBtn" disabled>⏹ Stop</button>
-</div>
-
-<div id="score"></div>
-<div id="log"></div>
-
-<script>
-const SOLFEJO = {C:"Dó",D:"Ré",E:"Mi",F:"Fá",G:"Sol",A:"Lá",B:"Si"};
-const SEMI = {C:-9,D:-7,E:-5,F:-4,G:-2,A:0,B:2};
-
-let osmd, events=[], divisions=4, idx=0;
-let ctx=new (window.AudioContext||window.webkitAudioContext)();
-let playing=false, timer=null;
-
-fileInput.onchange = e=>{
-  const r=new FileReader();
-  r.onload=()=>loadScore(r.result);
-  r.readAsText(e.target.files[0]);
-};
-
-playBtn.onclick = play;
-stopBtn.onclick = stop;
-
-async function loadScore(xml){
-  osmd ||= new opensheetmusicdisplay.OpenSheetMusicDisplay("score");
-  await osmd.load(xml);
-  osmd.render();
-  parseXML(xml);
-  playBtn.disabled = stopBtn.disabled = false;
-}
-
-function parseXML(txt){
-  events=[]; idx=0; log.textContent="";
-  const xml=new DOMParser().parseFromString(txt,"application/xml");
-  divisions=parseInt(xml.querySelector("divisions")?.textContent||4);
-
-  xml.querySelectorAll("note").forEach(n=>{
-    const dur=parseInt(n.querySelector("duration")?.textContent||0);
-    if(n.querySelector("rest")){
-      events.push({rest:true,dur});
-      return;
-    }
-    const step=n.querySelector("step")?.textContent;
-    const oct=parseInt(n.querySelector("octave")?.textContent);
-    const alter=parseInt(n.querySelector("alter")?.textContent||0);
-    events.push({step,oct,alter,dur});
-  });
-}
-
-function freq(step,oct,alter){
-  const a4=+hzInput.value;
-  const s=SEMI[step]+alter+(oct-4)*12;
-  return a4*Math.pow(2,s/12);
-}
-
-function play(){
-  if(playing) return;
-  playing=true;
-  ctx.resume();
-  next();
-}
-
-function stop(){
-  playing=false;
-  clearTimeout(timer);
-  speechSynthesis.cancel();
-  idx=0;
-}
-
-function next(){
-  if(!playing || idx>=events.length){ playing=false; return; }
-
-  const e=events[idx++];
-  const bpm=+bpmInput.value;
-  const ms=(60/bpm)*(e.dur/divisions)*1000;
-
-  if(!e.rest){
-    const f=freq(e.step,e.oct,e.alter);
-
-    /* MIDI (fundo) */
-    const osc=ctx.createOscillator();
-    const g=ctx.createGain();
-    g.gain.value=0.08;
-    osc.frequency.value=f;
-    osc.connect(g).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime+ms/1000);
-
-    /* FALA — DISPARADA NO MESMO INSTANTE */
-    const nome=SOLFEJO[e.step];
-    const u=new SpeechSynthesisUtterance(nome);
-    u.rate=1;
-    u.pitch=1;
-    speechSynthesis.speak(u);
-
-    log.textContent += `▶ ${nome}${e.oct} - ${f.toFixed(2)} Hz por ${Math.round(ms)} ms\n`;
-    log.scrollTop=log.scrollHeight;
-  }
-
-  timer=setTimeout(next,ms);
-}
-</script>
-</body>
-</html>
