@@ -40,7 +40,7 @@ button {
 }
 
 #stopBtn {
-  background: #ff6666;
+  background: #ff7777;
   color: #000;
   font-weight: bold;
 }
@@ -60,16 +60,27 @@ label {
   margin-top: 20px;
   background: #000;
   padding: 12px;
-  height: 260px;
+  height: 200px;
   overflow-y: auto;
   font-family: monospace;
-  font-size: 14px;
 }
 
 .note-current {
   font-size: 20px;
   color: #1db954;
   font-weight: bold;
+}
+
+.debug-panel {
+  margin-top: 20px;
+  background: #060606;
+  border: 1px solid #333;
+  padding: 12px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #aaa;
+  max-height: 220px;
+  overflow-y: auto;
 }
 </style>
 </head>
@@ -96,30 +107,26 @@ Solfejo Musical com Síntese de Voz e Tom Musical</h1>
 
 <div id="log"></div>
 
+<div class="debug-panel" id="debugPanel"></div>
+
 <script>
 let audioCtx;
 let isPlaying = false;
-let scheduled = [];
 let notes = [];
 let divisions = 4;
 
-const solfejoMap = {
-  C: "Dó",
-  D: "Ré",
-  E: "Mi",
-  F: "Fá",
-  G: "Sol",
-  A: "Lá",
-  B: "Si"
-};
+const solfejoMap = { C:"Dó", D:"Ré", E:"Mi", F:"Fá", G:"Sol", A:"Lá", B:"Si" };
 
 function log(msg, highlight=false) {
-  const div = document.createElement("div");
-  div.textContent = msg;
-  if (highlight) div.className = "note-current";
-  document.getElementById("log").appendChild(div);
-  document.getElementById("log").scrollTop = 999999;
+  const d = document.createElement("div");
+  d.textContent = msg;
+  if (highlight) d.className = "note-current";
+  logBox.appendChild(d);
+  logBox.scrollTop = logBox.scrollHeight;
 }
+
+const logBox = document.getElementById("log");
+const debugPanel = document.getElementById("debugPanel");
 
 function stepToFreq(step, octave, tuning) {
   const semis = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
@@ -135,93 +142,83 @@ function parseXML(text) {
   if (divNode) divisions = parseInt(divNode.textContent);
 
   xml.querySelectorAll("note").forEach(n => {
-    const rest = n.querySelector("rest");
     const duration = parseInt(n.querySelector("duration")?.textContent || 0);
-
-    if (rest) {
-      notes.push({rest:true, duration});
+    if (n.querySelector("rest")) {
+      notes.push({ rest:true, duration });
     } else {
       const step = n.querySelector("step")?.textContent;
       const octave = parseInt(n.querySelector("octave")?.textContent);
       if (step && !isNaN(octave)) {
-        notes.push({step, octave, duration});
+        notes.push({ step, octave, duration });
       }
     }
   });
 
-  log("✔ MusicXML carregado. Notas: " + notes.length);
+  log("✔ MusicXML carregado (" + notes.length + " eventos)");
 }
 
 function play() {
-  if (!notes.length) {
-    alert("Carregue um MusicXML primeiro.");
-    return;
-  }
+  if (!notes.length) return alert("Carregue um MusicXML primeiro.");
 
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   isPlaying = true;
-  scheduled = [];
-  document.getElementById("log").innerHTML = "";
+  logBox.innerHTML = "";
+  debugPanel.innerHTML = "";
 
-  const bpm = parseInt(document.getElementById("bpmInput").value);
-  const tuning = parseFloat(document.getElementById("tuningInput").value);
-  const beatMs = 60000 / bpm;
+  const bpm = +bpmInput.value;
+  const tuning = +tuningInput.value;
   let t = audioCtx.currentTime;
 
   notes.forEach(n => {
-    const durSec = (n.duration / divisions) * (60 / bpm);
+    const durMs = (n.duration / divisions) * (60000 / bpm);
+    const durSec = durMs / 1000;
 
     if (n.rest) {
+      debugPanel.innerHTML += `▶ PAUSA - ${durMs.toFixed(0)} ms<br>`;
       t += durSec;
       return;
     }
 
     const freq = stepToFreq(n.step, n.octave, tuning);
-
-    // MIDI de fundo
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     gain.gain.value = 0.08;
 
     osc.frequency.value = freq;
-    osc.type = "sine";
     osc.connect(gain).connect(audioCtx.destination);
     osc.start(t);
     osc.stop(t + durSec);
 
-    // Voz sincronizada
-    const u = new SpeechSynthesisUtterance(solfejoMap[n.step]);
-    u.rate = 1;
-    u.pitch = 1;
-    u.volume = 1;
-
     setTimeout(() => {
       if (!isPlaying) return;
-      log(`▶ ${solfejoMap[n.step]} ${n.step}${n.octave} ${freq.toFixed(2)} Hz`, true);
-      speechSynthesis.speak(u);
+      log(`▶ ${solfejoMap[n.step]}${n.octave}`, true);
+      speechSynthesis.speak(new SpeechSynthesisUtterance(solfejoMap[n.step]));
     }, (t - audioCtx.currentTime) * 1000);
 
+    debugPanel.innerHTML += `▶ ${solfejoMap[n.step]}${n.octave} - ${freq.toFixed(2)} Hz por ${durMs.toFixed(0)} ms<br>`;
     t += durSec;
   });
+
+  setTimeout(() => {
+    debugPanel.innerHTML += "=== REPRODUÇÃO FINALIZADA ===<br>";
+  }, (t - audioCtx.currentTime) * 1000);
 }
 
 function stop() {
   isPlaying = false;
   speechSynthesis.cancel();
   if (audioCtx) audioCtx.close();
-  log("⏹ Parado.");
+  debugPanel.innerHTML += "=== PARADO MANUALMENTE ===<br>";
 }
 
-document.getElementById("fileInput").addEventListener("change", e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => parseXML(reader.result);
-  reader.readAsText(file);
-});
+fileInput.onchange = e => {
+  const r = new FileReader();
+  r.onload = () => parseXML(r.result);
+  r.readAsText(e.target.files[0]);
+};
 
-document.getElementById("playBtn").onclick = play;
-document.getElementById("stopBtn").onclick = stop;
+playBtn.onclick = play;
+stopBtn.onclick = stop;
 </script>
 
 </body>
