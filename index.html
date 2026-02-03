@@ -2,57 +2,66 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>🎼 VoxSolfejo – Solfejo Musical com Síntese de Voz e Tom Musical</title>
+<title>🎼 VoxSolfejo – Solfejo Musical com Voz, MIDI e Partitura</title>
 
 <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
 
 <style>
 body {
-  font-family: Arial, sans-serif;
-  background: #020617;
-  color: #e5e7eb;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #0f172a;
+  color: #f1f5f9;
   padding: 20px;
+}
+
+h2 {
+  color: #38bdf8;
+  margin-bottom: 10px;
 }
 
 .controls {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
   flex-wrap: wrap;
+  margin-bottom: 12px;
 }
 
 #score {
   background: white;
   margin-top: 10px;
   border-radius: 6px;
+  padding: 10px;
 }
 
 #log {
-  background: #020617;
+  background: #1e293b;
   margin-top: 1em;
-  margin-left: 20px;
-  padding: 10px;
+  padding: 12px;
   border-radius: 6px;
   font-family: monospace;
-  font-size: 13px;
+  font-size: 14px;
   max-height: 240px;
   overflow-y: auto;
-  display: block;
-  unicode-bidi: isolate;
 }
 
 .log-active {
-  color: #22d3ee;
+  color: #38bdf8;
   font-size: 15px;
   font-weight: bold;
 }
 
 button {
-  padding: 10px 18px;
+  padding: 12px 20px;
   font-size: 15px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+button:hover {
+  transform: scale(1.05);
 }
 
 #playBtn {
@@ -68,26 +77,33 @@ button {
 }
 
 #fileInput {
-  background: #1f2933;
+  background: #334155;
   padding: 8px;
   border-radius: 6px;
   font-size: 14px;
   color: white;
 }
+
+#status {
+  margin-top: 8px;
+  font-weight: bold;
+  color: #facc15;
+}
 </style>
 </head>
 
 <body>
-<h2>🎼 VoxSolfejo<br>Solfejo Musical com Síntese de Voz e Tom Musical</h2>
+<h2>🎼 VoxSolfejo<br>Solfejo Musical com Voz, MIDI e Partitura</h2>
 
 <div class="controls">
   <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl">
   <label>BPM: <input type="number" id="bpmInput" value="80"></label>
   <label>A4: <input type="number" id="hzInput" value="440"></label>
-  <button id="playBtn" disabled>Reproduzir Solfejo</button>
-  <button id="stopBtn" disabled>PARAR</button>
+  <button id="playBtn" disabled>▶ Reproduzir</button>
+  <button id="stopBtn" disabled>⏹ Parar</button>
 </div>
 
+<div id="status">Status: aguardando arquivo...</div>
 <div id="score"></div>
 <div id="log"></div>
 
@@ -108,6 +124,7 @@ let osmd, events=[], divisions=4, idx=0;
 let ctx=new (window.AudioContext||window.webkitAudioContext)();
 let playing=false, timer=null;
 let lastActiveLine=null;
+let cursor=null;
 
 fileInput.onchange=e=>{
   const r=new FileReader();
@@ -122,8 +139,11 @@ async function loadScore(xml){
   osmd ||= new opensheetmusicdisplay.OpenSheetMusicDisplay("score",{drawTitle:false});
   await osmd.load(xml);
   osmd.render();
+  cursor = osmd.cursor;
+  cursor.show();
   parseXML(xml);
   playBtn.disabled = stopBtn.disabled = false;
+  document.getElementById("status").textContent = "Status: pronto para reproduzir 🎶";
 }
 
 function parseXML(txt){
@@ -169,6 +189,8 @@ function play(){
   playing=true;
   ctx.resume();
   idx=0;
+  cursor.reset();
+  document.getElementById("status").textContent = "Status: reproduzindo 🎵";
   next();
 }
 
@@ -177,6 +199,8 @@ function stop(){
   clearTimeout(timer);
   speechSynthesis.cancel();
   idx=0;
+  if(cursor) cursor.reset();
+  document.getElementById("status").textContent = "Status: parado ⏹";
 }
 
 function addLogLine(text){
@@ -195,6 +219,8 @@ function next(){
   if(!playing||idx>=events.length){
     playing=false;
     log.innerHTML += `<div>=== REPRODUÇÃO FINALIZADA ===</div>`;
+    if(cursor) cursor.reset();
+    document.getElementById("status").textContent = "Status: finalizado ✅";
     return;
   }
 
@@ -214,22 +240,27 @@ function next(){
   if(!e.rest){
     const f=freq(e.step,e.oct,e.alter);
 
+    // Oscilador sincronizado
     const osc=ctx.createOscillator();
     const g=ctx.createGain();
     g.gain.value=0.08;
     osc.frequency.value=f;
     osc.connect(g).connect(ctx.destination);
-    osc.start();
+    osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime+ms/1000);
 
+    // Voz sincronizada
     const texto=solfejoFalado(e.step,ms);
     const u=new SpeechSynthesisUtterance(texto);
     u.rate=1;
+    u.onstart = ()=> {
+      addLogLine(`🎶 ${texto} - ${Math.round(ms)} ms`);
+      if(cursor) cursor.next(); // move highlight na partitura
+    };
     speechSynthesis.speak(u);
-
-    addLogLine(`▶▶ ${texto} - ${Math.round(ms)} ms`);
   } else {
     addLogLine(`(pausa) - ${Math.round(ms)} ms`);
+    if(cursor) cursor.next();
   }
 
   timer=setTimeout(next,ms);
