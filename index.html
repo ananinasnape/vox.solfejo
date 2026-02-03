@@ -9,34 +9,36 @@ body {
   font-family: system-ui, sans-serif;
   background: #0f172a;
   color: #e5e7eb;
-  padding: 20px;
+  padding: 24px;
 }
 
 h1 {
-  margin-bottom: 10px;
+  font-size: 32px;
+  margin-bottom: 16px;
 }
 
 .controls {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 #fileInput {
-  padding: 10px;
+  padding: 14px;
+  font-size: 16px;
   border: 2px dashed #38bdf8;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #020617;
   color: #e5e7eb;
   cursor: pointer;
 }
 
 button {
-  font-size: 20px;
-  padding: 12px 26px;
-  border-radius: 10px;
+  font-size: 24px;
+  padding: 14px 32px;
+  border-radius: 12px;
   border: none;
   cursor: pointer;
 }
@@ -47,7 +49,7 @@ button {
 }
 
 #stopBtn {
-  background: #f87171;
+  background: #fb7185;
   color: #020617;
 }
 
@@ -57,21 +59,28 @@ button:disabled {
 }
 
 label {
-  font-size: 14px;
+  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 input[type="number"] {
-  width: 80px;
-  padding: 6px;
-  border-radius: 6px;
+  width: 100px;
+  padding: 8px;
+  font-size: 16px;
+  border-radius: 8px;
   border: none;
 }
 
 #log {
-  margin-top: 15px;
+  margin-top: 20px;
   font-family: monospace;
-  font-size: 14px;
+  font-size: 15px;
   white-space: pre-line;
+  background: #020617;
+  padding: 12px;
+  border-radius: 8px;
 }
 </style>
 </head>
@@ -82,6 +91,7 @@ input[type="number"] {
 
 <div class="controls">
   <input type="file" id="fileInput" accept=".xml,.musicxml">
+
   <button id="playBtn" disabled>▶ PLAY</button>
   <button id="stopBtn" disabled>⏹ STOP</button>
 
@@ -101,18 +111,10 @@ let notesTimeline = [];
 let audioCtx;
 let stopFlag = false;
 
-const solfejo = {
-  C: "Dó",
-  D: "Ré",
-  E: "Mi",
-  F: "Fá",
-  G: "Sol",
-  A: "Lá",
-  B: "Si"
-};
+const solfejo = { C:"Dó", D:"Ré", E:"Mi", F:"Fá", G:"Sol", A:"Lá", B:"Si" };
 
-function stepToMidi(step, octave, alter = 0) {
-  const base = {C:0, D:2, E:4, F:5, G:7, A:9, B:11}[step];
+function stepToMidi(step, octave, alter=0) {
+  const base = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[step];
   return 12 * (octave + 1) + base + alter;
 }
 
@@ -124,34 +126,25 @@ function parseMusicXML(xmlText) {
   notesTimeline = [];
   const xml = new DOMParser().parseFromString(xmlText, "application/xml");
 
-  const divisionsNode = xml.querySelector("divisions");
-  const divisions = divisionsNode ? parseInt(divisionsNode.textContent) : 4;
-
-  let bpm = parseInt(document.getElementById("bpmInput").value);
+  const divisions = parseInt(xml.querySelector("divisions")?.textContent || 4);
+  const bpm = parseInt(document.getElementById("bpmInput").value);
   const quarterMs = 60000 / bpm;
 
   xml.querySelectorAll("note").forEach(note => {
-    const durationDiv = parseInt(note.querySelector("duration")?.textContent || 0);
-    const durationMs = (durationDiv / divisions) * quarterMs;
+    const durDiv = parseInt(note.querySelector("duration")?.textContent || 0);
+    const durMs = (durDiv / divisions) * quarterMs;
 
     if (note.querySelector("rest")) {
-      notesTimeline.push({ rest: true, duration: durationMs });
+      notesTimeline.push({ rest:true, duration:durMs });
       return;
     }
 
     const step = note.querySelector("step")?.textContent;
     const octave = parseInt(note.querySelector("octave")?.textContent);
     const alter = parseInt(note.querySelector("alter")?.textContent || 0);
-
     if (!step || isNaN(octave)) return;
 
-    notesTimeline.push({
-      rest: false,
-      step,
-      octave,
-      alter,
-      duration: durationMs
-    });
+    notesTimeline.push({ rest:false, step, octave, alter, duration:durMs });
   });
 
   return notesTimeline.length > 0;
@@ -161,8 +154,6 @@ async function playTimeline() {
   stopFlag = false;
   audioCtx = new AudioContext();
   const a4 = parseFloat(document.getElementById("a4Input").value);
-  let t = audioCtx.currentTime;
-
   document.getElementById("log").textContent = "";
 
   for (const n of notesTimeline) {
@@ -176,19 +167,15 @@ async function playTimeline() {
     const midi = stepToMidi(n.step, n.octave, n.alter);
     const freq = midiToFreq(midi, a4);
 
-    // MIDI de fundo
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.frequency.value = freq;
     gain.gain.value = 0.05;
     osc.connect(gain).connect(audioCtx.destination);
-    osc.start(t);
-    osc.stop(t + n.duration / 1000);
+    osc.start();
+    osc.stop(audioCtx.currentTime + n.duration / 1000);
 
-    // Voz falada sincronizada
     const utter = new SpeechSynthesisUtterance(solfejo[n.step]);
-    utter.rate = 1;
-    utter.pitch = freq / 440;
     utter.volume = 1;
     speechSynthesis.speak(utter);
 
@@ -199,32 +186,26 @@ async function playTimeline() {
   }
 }
 
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
-}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
-document.getElementById("fileInput").addEventListener("change", e => {
+fileInput.onchange = e => {
   const file = e.target.files[0];
   if (!file) return;
+  const r = new FileReader();
+  r.onload = () => playBtn.disabled = !parseMusicXML(r.result);
+  r.readAsText(file);
+};
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    const ok = parseMusicXML(reader.result);
-    document.getElementById("playBtn").disabled = !ok;
-  };
-  reader.readAsText(file);
-});
-
-document.getElementById("playBtn").onclick = () => {
-  document.getElementById("playBtn").disabled = true;
-  document.getElementById("stopBtn").disabled = false;
-  playTimeline().finally(() => {
-    document.getElementById("playBtn").disabled = false;
-    document.getElementById("stopBtn").disabled = true;
+playBtn.onclick = () => {
+  playBtn.disabled = true;
+  stopBtn.disabled = false;
+  playTimeline().finally(()=>{
+    playBtn.disabled = false;
+    stopBtn.disabled = true;
   });
 };
 
-document.getElementById("stopBtn").onclick = () => {
+stopBtn.onclick = () => {
   stopFlag = true;
   speechSynthesis.cancel();
   audioCtx?.close();
