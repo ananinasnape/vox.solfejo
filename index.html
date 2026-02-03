@@ -1,151 +1,253 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VoxSolfejo Maestro</title>
+  <meta charset="UTF-8" />
+  <title>VoxSolfejo – Core Funcional</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.0/build/opensheetmusicdisplay.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
+  <!-- OSMD -->
+  <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.7/build/opensheetmusicdisplay.min.js"></script>
 
-<style>
-body { background:#0f172a; color:white; }
-button:disabled { opacity:.4; }
-</style>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f1f5f9;
+      margin: 0;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+    }
+    #controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    button, input {
+      padding: 10px;
+      font-size: 0.9rem;
+    }
+    button {
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #status {
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+    }
+    #score {
+      background: white;
+      border-radius: 8px;
+      padding: 8px;
+      min-height: 300px;
+    }
+  </style>
 </head>
 
-<body class="p-4">
+<body>
 
-<div class="max-w-5xl mx-auto bg-slate-800 rounded-2xl p-4 space-y-4">
+<h1>🎼 VoxSolfejo (Core Funcional)</h1>
 
-<header class="flex justify-between items-center">
-  <h1 class="text-xl font-bold">🎼 VoxSolfejo Maestro</h1>
-
-  <label class="bg-indigo-600 px-4 py-2 rounded cursor-pointer">
-    Upload MusicXML
-    <input type="file" id="fileInput" class="hidden" accept=".xml,.musicxml,.mxl">
-  </label>
-</header>
-
-<div id="osmdCanvas" class="bg-white rounded-xl p-2 min-h-[300px] text-black">
-  <p class="text-center text-gray-400 mt-24">Carregue uma partitura MusicXML</p>
+<div id="controls">
+  <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl" />
+  <button id="playBtn" disabled>▶ Play</button>
+  <button id="stopBtn" disabled>⏹ Stop</button>
 </div>
 
-<div class="flex gap-4 items-center">
-  <button id="playBtn" disabled
-    class="flex-1 bg-green-600 py-3 rounded-xl font-bold text-lg">
-    ▶ PLAY
-  </button>
+<div id="status">Carregue um MusicXML para começar.</div>
 
-  <button id="stopBtn"
-    class="bg-red-600 px-6 py-3 rounded-xl font-bold">
-    ■
-  </button>
-</div>
-
-<div class="flex gap-4 text-sm">
-  <div>
-    BPM:
-    <input id="bpm" type="number" value="80" class="text-black w-16 ml-1">
-  </div>
-  <div>
-    Afinação:
-    <input id="hz" type="number" value="440" class="text-black w-20 ml-1">
-  </div>
-</div>
-
-</div>
+<div id="score"></div>
 
 <script>
-let osmd;
-let queue = [];
-let audioCtx;
-let playing = false;
+/* =========================
+   CONFIGURAÇÃO
+========================= */
 
-const NOTE_INDEX = { C:-9, D:-7, E:-5, F:-4, G:-2, A:0, B:2 };
+const SOLFEJO = ["Do", "Re", "Mi", "Fa", "Sol", "La", "Si"];
+let osmd = null;
+let timeline = [];
+let isPlaying = false;
+let stopRequested = false;
 
-function freqFromNote(letter, octave, hz) {
-  const semitones = NOTE_INDEX[letter] + (octave - 4) * 12;
-  return hz * Math.pow(2, semitones / 12);
-}
+/* =========================
+   INICIALIZAÇÃO
+========================= */
 
-document.getElementById("fileInput").onchange = async e => {
+osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("score", {
+  drawTitle: true,
+  autoResize: true
+});
+
+/* =========================
+   UPLOAD E PARSE
+========================= */
+
+document.getElementById("fileInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  if (!osmd) {
-    osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay("osmdCanvas");
+  setStatus("Carregando partitura...");
+  resetPlayer();
+
+  const text = await file.text();
+
+  try {
+    await osmd.load(text);
+    osmd.render();
+    buildTimeline();
+  } catch (err) {
+    console.error(err);
+    setStatus("Erro ao carregar o MusicXML.");
   }
+});
 
-  await osmd.load(URL.createObjectURL(file));
-  osmd.render();
+/* =========================
+   CONSTRUÇÃO DA TIMELINE
+========================= */
 
-  queue = [];
+function buildTimeline() {
+  timeline = [];
 
-  const measures =
-    osmd.GraphicSheet.MusicPages[0]
-      .MusicSystems[0]
-      .StaffLines[0]
-      .Measures;
+  try {
+    const sheet = osmd.Sheet;
+    const instruments = sheet.Instruments;
 
-  measures.forEach(m =>
-    m.StaffEntries.forEach(se => {
-      const model = se.ModelStaffEntry;
-      const dur = model.Duration.RealValue;
+    instruments.forEach(instr => {
+      instr.Staves.forEach(staff => {
+        staff.Voices.forEach(voice => {
+          voice.VoiceEntries.forEach(entry => {
 
-      if (model.Notes.length > 0) {
-        const n = model.Notes[0].Pitch;
-        queue.push({
-          letter: "CDEFGAB"[n.FundamentalNote],
-          octave: n.Octave + 3,
-          dur
+            const duration = entry.Duration?.RealValue;
+            if (!duration || duration <= 0) return;
+
+            if (entry.Notes.length === 0) {
+              timeline.push({ type: "rest", duration });
+            } else {
+              entry.Notes.forEach(note => {
+                if (!note.Pitch) return;
+
+                const step = note.Pitch.FundamentalNote;
+                const solfejo = SOLFEJO[step];
+
+                if (!solfejo) return;
+
+                timeline.push({
+                  type: "note",
+                  text: solfejo,
+                  duration
+                });
+              });
+            }
+          });
         });
-      } else {
-        queue.push({ rest:true, dur });
-      }
-    })
-  );
+      });
+    });
 
-  document.getElementById("playBtn").disabled = false;
-};
-
-async function play() {
-  if (playing || queue.length === 0) return;
-  playing = true;
-
-  if (!audioCtx) audioCtx = new AudioContext();
-  await audioCtx.resume();
-
-  const bpm = +document.getElementById("bpm").value;
-  const hz = +document.getElementById("hz").value;
-
-  for (const n of queue) {
-    if (!playing) break;
-
-    const durSec = n.dur * (60 / bpm) * 4;
-
-    if (!n.rest) {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-
-      osc.frequency.value = freqFromNote(n.letter, n.octave, hz);
-      gain.gain.value = 0.25;
-
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      osc.start();
-      osc.stop(audioCtx.currentTime + durSec);
+    if (timeline.length === 0) {
+      setStatus("Nenhuma nota válida encontrada.");
+      return;
     }
 
-    await new Promise(r => setTimeout(r, durSec * 1000));
-  }
+    validateTimeline();
+    enablePlay();
 
-  playing = false;
+  } catch (e) {
+    console.error(e);
+    setStatus("Erro ao processar a partitura.");
+  }
 }
 
-document.getElementById("playBtn").onclick = play;
-document.getElementById("stopBtn").onclick = () => playing = false;
+/* =========================
+   VALIDAÇÃO MUSICAL
+========================= */
+
+function validateTimeline() {
+  for (let i = 0; i < timeline.length; i++) {
+    const ev = timeline[i];
+    if (ev.type === "note" && !ev.text) {
+      throw new Error("Nota inválida.");
+    }
+    if (ev.duration <= 0) {
+      throw new Error("Duração inválida.");
+    }
+  }
+  setStatus(`Partitura validada. ${timeline.length} eventos prontos.`);
+}
+
+/* =========================
+   PLAYER
+========================= */
+
+document.getElementById("playBtn").addEventListener("click", async () => {
+  if (isPlaying || timeline.length === 0) return;
+
+  // destrava áudio no Chrome
+  speechSynthesis.cancel();
+  await speechSynthesis.getVoices();
+
+  isPlaying = true;
+  stopRequested = false;
+  setStatus("Tocando solfejo...");
+  document.getElementById("stopBtn").disabled = false;
+
+  const bpm = 60;
+
+  for (const ev of timeline) {
+    if (stopRequested) break;
+
+    const ms = ev.duration * (60000 / bpm) * 4;
+
+    if (ev.type === "note") {
+      const u = new SpeechSynthesisUtterance(ev.text);
+      u.lang = "pt-BR";
+      u.rate = 1;
+      speechSynthesis.speak(u);
+    }
+
+    await wait(ms);
+  }
+
+  stopPlayback();
+});
+
+document.getElementById("stopBtn").addEventListener("click", () => {
+  stopPlayback();
+});
+
+/* =========================
+   UTILIDADES
+========================= */
+
+function wait(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function stopPlayback() {
+  stopRequested = true;
+  isPlaying = false;
+  speechSynthesis.cancel();
+  document.getElementById("stopBtn").disabled = true;
+  setStatus("Parado.");
+}
+
+function resetPlayer() {
+  stopPlayback();
+  timeline = [];
+  document.getElementById("playBtn").disabled = true;
+}
+
+function enablePlay() {
+  document.getElementById("playBtn").disabled = false;
+}
+
+function setStatus(msg) {
+  document.getElementById("status").innerText = msg;
+}
 </script>
 
 </body>
