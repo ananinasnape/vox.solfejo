@@ -103,7 +103,8 @@ function freq(s,o,a){
 
 function solfejo(s,ms){
   const b=SOLFEJO[s];
-  const rep=Math.max(1,Math.round(ms/200)); 
+  // repete a vogal proporcionalmente à duração
+  const rep=Math.max(1,Math.round(ms/200));
   return b.n+("-"+b.v).repeat(rep);
 }
 
@@ -147,9 +148,9 @@ function next(){
     const txt=solfejo(e.s,ms);
     const u=new SpeechSynthesisUtterance(txt);
 
-    /* VOZ SINCRONIZADA COM O TEMPO DA NOTA */
-    // Ajusta a velocidade para caber dentro de ms
-    const estTempo = txt.length * 90; // estimativa de fala normal
+    /* Cada nota começa junto com o MIDI e termina junto com ele, sem cortar a palavra no meio */
+    // Calcular a taxa de fala (rate) com base em ms (duração da nota)
+    const estTempo = txt.length * 100; // tempo estimado de fala normal
     const rate = Math.min(3, Math.max(0.5, estTempo / ms));
     u.rate = rate;
     u.volume = 1;
