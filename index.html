@@ -282,10 +282,13 @@ function next(){
     const u=new SpeechSynthesisUtterance(texto);
 
     /* 🔑 SINCRONIA ABSOLUTA */
-    u.rate = Math.min(3, Math.max(0.5, 120/ms*1000));
+    u.rate = Math.min(6, Math.max(1.5, 240/ms*1000));
     u.volume = 1;
 
     speechSynthesis.speak(u);
+    setTimeout(() => {
+  speechSynthesis.cancel();
+}, ms);
 
     debugPanel.innerHTML+=`▶ ${texto} - ${Math.round(ms)} ms<br>`;
     debugPanel.scrollTop=debugPanel.scrollHeight;
@@ -298,3 +301,4 @@ function next(){
 </div>
 </body>
 </html>
+
